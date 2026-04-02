@@ -637,7 +637,25 @@ function analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
     // Calculate average speeds
     $avg_speed = $total_time > 0 ? ($total_distance / 1000) / ($total_time / 3600) : 0;
     $hiking_speed = $hiking_time > 0 ? ($hiking_distance / 1000) / ($hiking_time / 3600) : 0;
-    
+
+    // Sample track points for map/chart rendering (max 800 keeps JSON compact)
+    $total_points = count($points);
+    $max_map_pts = 800;
+    $sampled_track = [];
+    if ($total_points <= $max_map_pts) {
+        foreach ($points as $p) {
+            $sampled_track[] = [round($p['lat'], 6), round($p['lon'], 6), round($p['ele'], 1)];
+        }
+    } else {
+        $step = $total_points / $max_map_pts;
+        for ($si = 0; $si < $max_map_pts - 1; $si++) {
+            $p = $points[(int)round($si * $step)];
+            $sampled_track[] = [round($p['lat'], 6), round($p['lon'], 6), round($p['ele'], 1)];
+        }
+        $p = $points[$total_points - 1];
+        $sampled_track[] = [round($p['lat'], 6), round($p['lon'], 6), round($p['ele'], 1)];
+    }
+
     return [
         'total_time' => $total_time,
         'hiking_time' => $hiking_time,
@@ -662,8 +680,42 @@ function analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
         'polygon_check_debug' => isset($polygon_coords) ? 'Vertices: ' . count($polygon_coords) . ', First: ' . json_encode($polygon_coords[0]) : 'No polygon',
         'points_in_zone' => isset($points_in_zone) ? $points_in_zone : 0,
         'stationary_in_zone' => isset($stationary_in_zone) ? $stationary_in_zone : 0,
-        'speed_range_in_zone' => isset($min_speed_in_zone) && $min_speed_in_zone < 999 ? round($min_speed_in_zone, 2) . '-' . round($max_speed_in_zone, 2) . ' km/h' : 'N/A'
+        'speed_range_in_zone' => isset($min_speed_in_zone) && $min_speed_in_zone < 999 ? round($min_speed_in_zone, 2) . '-' . round($max_speed_in_zone, 2) . ' km/h' : 'N/A',
+        'track_points' => $sampled_track,
     ];
+}
+
+/**
+ * Parse GPX file and return sampled track points as [[lat, lon, ele], ...].
+ * Used when GPX stats are disabled but we still need coordinates for the map.
+ */
+function sota_get_gpx_track_points($gpx_url, $max_points = 800) {
+    $gpx_content = @file_get_contents($gpx_url);
+    if (!$gpx_content) return [];
+    $xml = @simplexml_load_string($gpx_content);
+    if (!$xml) return [];
+    $xml->registerXPathNamespace('gpx', 'http://www.topografix.com/GPX/1/1');
+    $trackpoints = $xml->xpath('//gpx:trkpt');
+    if (!$trackpoints || count($trackpoints) < 2) return [];
+
+    $raw = [];
+    foreach ($trackpoints as $pt) {
+        $lat = floatval($pt['lat']);
+        $lon = floatval($pt['lon']);
+        if ($lat === 0.0 && $lon === 0.0) continue; // skip GPS cold-start artifacts
+        $raw[] = [round($lat, 6), round($lon, 6), round(floatval($pt->ele), 1)];
+    }
+
+    $n = count($raw);
+    if ($n <= $max_points) return $raw;
+
+    $out = [];
+    $step = $n / $max_points;
+    for ($i = 0; $i < $max_points - 1; $i++) {
+        $out[] = $raw[(int)round($i * $step)];
+    }
+    $out[] = $raw[$n - 1]; // always include last point
+    return $out;
 }
 
 /**
@@ -1019,8 +1071,16 @@ function ki6cr_render_sota_data($atts) {
 
     // Analyze GPX if available and stats are enabled
     $gpx_stats = null;
+    $track_points = [];
     if ($gpx_url && $show_gpx_stats) {
         $gpx_stats = analyze_gpx_track($gpx_url, $csv_url, $force_radius_zone);
+        if ($gpx_stats && !empty($gpx_stats['track_points'])) {
+            $track_points = $gpx_stats['track_points'];
+        }
+    }
+    // Fallback: parse track points without full stats analysis
+    if ($gpx_url && empty($track_points)) {
+        $track_points = sota_get_gpx_track_points($gpx_url);
     }
 
     // Apply manual overrides to GPX stats
@@ -1059,6 +1119,58 @@ function ki6cr_render_sota_data($atts) {
     $map_iframe_url = '';
     if ($show_map && $csv_url) {
         $map_iframe_url = plugins_url('contact-map.php', __FILE__) . '?csv=' . urlencode($csv_url) . '&v=1.3';
+    }
+
+    // Unique map ID for this block (static counter survives multiple blocks on one page)
+    static $sota_map_counter = 0;
+    $sota_map_counter++;
+    $map_id = 'sota-gpx-map-' . $sota_map_counter;
+
+    // Enqueue map assets and register per-block init call
+    if ($gpx_url && !empty($track_points)) {
+        wp_enqueue_style('sota-leaflet', plugins_url('lib/leaflet.css', __FILE__), [], '1.9.4');
+        wp_enqueue_script('sota-leaflet-js', plugins_url('lib/leaflet.js', __FILE__), [], '1.9.4', true);
+        wp_enqueue_script('sota-chartjs', plugins_url('lib/chart.umd.min.js', __FILE__), [], '4.4.0', true);
+        wp_enqueue_script('sota-magic-map', plugins_url('sota-magic-map.js', __FILE__), ['sota-leaflet-js', 'sota-chartjs'], '1.1.0', true);
+
+        // Build activation zone payload
+        $az_data = null;
+        if ($gpx_stats) {
+            if ($gpx_stats['using_api'] && !empty($gpx_stats['activation_zone_polygon'])) {
+                $leaflet_coords = [];
+                foreach ($gpx_stats['activation_zone_polygon'][0] as $coord) {
+                    $leaflet_coords[] = [$coord[1], $coord[0]]; // [lon,lat] → [lat,lon]
+                }
+                $az_data = ['mode' => 'polygon', 'coordinates' => $leaflet_coords];
+            } else {
+                $az_data = ['mode' => 'circle', 'radius' => (float)$gpx_stats['activation_zone_radius']];
+            }
+        }
+
+        // Summit coordinates
+        $summit_lat = $gpx_stats ? (float)$gpx_stats['summit_lat'] : null;
+        $summit_lon = $gpx_stats ? (float)$gpx_stats['summit_lon'] : null;
+        // Derive from highest track point if stats weren't computed
+        if ($summit_lat === null && !empty($track_points)) {
+            $highest = null;
+            foreach ($track_points as $tp) {
+                if ($highest === null || $tp[2] > $highest[2]) $highest = $tp;
+            }
+            if ($highest) { $summit_lat = $highest[0]; $summit_lon = $highest[1]; }
+        }
+
+        $map_data = [
+            'trackPoints'    => $track_points,
+            'summitLat'      => $summit_lat,
+            'summitLon'      => $summit_lon,
+            'activationZone' => $az_data,
+            'units'          => $unit_system,
+            'popupText'      => 'Summit / Activation Zone',
+        ];
+
+        wp_add_inline_script('sota-magic-map',
+            'sotaMagicInitMap(' . wp_json_encode($map_id) . ', ' . wp_json_encode($map_data) . ');'
+        );
     }
 
     ob_start();
@@ -1171,17 +1283,24 @@ function ki6cr_render_sota_data($atts) {
             font-size: 0.75em;
             margin-left: 5px;
         }
-        .wpgpxmaps {
-            background: #fff !important;
-            padding: 10px;
-            border-radius: 8px;
+        /* GPX map + elevation chart */
+        .sota-gpx-map {
+            width: 100%;
+            height: 400px;
+            border-radius: 8px 8px 0 0;
+            background: #e8e8e8;
         }
-        .wpgpxmaps * {
-            color: #000 !important;
-        }
-        .wpgpxmaps a {
-            color: #0073aa !important;
-            text-decoration: underline !important;
+        .sota-gpx-chart-wrap {
+            width: 100%;
+            height: 140px;
+            margin-bottom: 16px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            position: relative;
+            padding: 4px 4px 8px 4px;
+            box-sizing: border-box;
         }
         /* Stats help modal */
         .sota-modal-backdrop {
@@ -1325,66 +1444,15 @@ function ki6cr_render_sota_data($atts) {
     <div class="sota-main-container">
         <?php if ($gpx_url): ?>
             <h3>🏔️ <?php echo esc_html(get_option('sota_headline_gpx')); ?></h3>
-            <?php echo do_shortcode('[sgpx gpx="'.esc_url($gpx_url).'"]'); ?>
-            
-            <?php if ($gpx_stats && ($gpx_stats['using_api'] || $gpx_stats['activation_zone_radius'])): ?>
-            <?php
-            // Enqueue the overlay JavaScript file
-            wp_enqueue_script(
-                'sota-magic-overlay',
-                plugins_url('sota-magic-overlay.js', __FILE__),
-                array('jquery', 'leaflet'),
-                '1.0.0',
-                true
-            );
-            
-            // Prepare data for JavaScript
-            if ($gpx_stats['using_api'] && $gpx_stats['activation_zone_polygon']) {
-                // Convert polygon coordinates from [lon, lat] to [lat, lon] for Leaflet
-                $leaflet_coords = array();
-                foreach ($gpx_stats['activation_zone_polygon'][0] as $coord) {
-                    $leaflet_coords[] = array($coord[1], $coord[0]); // Swap lon,lat to lat,lon
-                }
-                
-                $script_data = array(
-                    'mode' => 'polygon',
-                    'coordinates' => $leaflet_coords,
-                    'summit_lat' => $gpx_stats['summit_lat'],
-                    'summit_lon' => $gpx_stats['summit_lon'],
-                    'popup_text' => 'Summit / Activation Zone'
-                );
-            } else {
-                $script_data = array(
-                    'mode' => 'circle',
-                    'summit_lat' => $gpx_stats['summit_lat'],
-                    'summit_lon' => $gpx_stats['summit_lon'],
-                    'radius' => $gpx_stats['activation_zone_radius'],
-                    'popup_text' => 'Summit (radius approximation)'
-                );
-            }
-            
-            // Pass data to JavaScript
-            wp_localize_script('sota-magic-overlay', 'sotaMagicData', $script_data);
-            ?>
+            <?php if (!empty($track_points)): ?>
+            <div id="<?php echo esc_attr($map_id); ?>" class="sota-gpx-map"></div>
+            <div class="sota-gpx-chart-wrap">
+                <canvas id="<?php echo esc_attr($map_id); ?>-chart"></canvas>
+            </div>
+            <?php else: ?>
+            <p style="color:#888;font-style:italic;margin:10px 0 16px;">Map unavailable — GPX file could not be loaded.</p>
             <?php endif; ?>
-            
-            <script>
-                (function() {
-                    var fix = function() {
-                        document.querySelectorAll('.wpgpxmaps td, .wpgpxmaps span').forEach(function(el) {
-                            if (el.innerText.match(/\d+\.\d{3,}/)) {
-                                var num = parseFloat(el.innerText);
-                                if (!isNaN(num)) {
-                                    var unit = el.innerText.replace(/[0-9.]/g, '').trim();
-                                    el.innerText = num.toFixed(2) + ' ' + unit;
-                                }
-                            }
-                        });
-                    };
-                    setInterval(fix, 1000);
-                })();
-            </script>
-            
+
             <?php if ($gpx_stats): ?>
                 <div class="sota-stats-header">
                     <span class="sota-stats-header-label">Hike Statistics</span>
