@@ -1,152 +1,66 @@
 === SOTA Magic ===
-Contributors: KI6CR
-Tags: sota, amateur radio, ham radio, gpx, contacts, mapping
-Requires at least: 5.0
-Tested up to: 6.4
-Stable tag: 0.517 Beta
+Contributors: ki6cr
+Tags: sota, amateur radio, ham radio, gpx, mapping
+Requires at least: 6.0
+Tested up to: 6.9
+Stable tag: 1.0.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Block-based SOTA activation data uploader with intelligent GPX track analysis using activation.zone API, contact tables, and interactive mapping.
+Display SOTA activation data beautifully — GPX maps, elevation charts, hiking stats, contact tables, and a contact map. No other plugins needed.
 
 == Description ==
 
-SOTA Magic is a comprehensive WordPress plugin designed for amateur radio operators participating in Summits On The Air (SOTA) activations. Display your activation data beautifully on your WordPress site with GPX track maps, detailed contact logs, and interactive contact mapping.
+SOTA Magic is a WordPress plugin for amateur radio operators participating in Summits On The Air (SOTA). Add the SOTAMAGIC Gutenberg block to any post or page, upload your GPX track and SOTA CSV log, and the plugin automatically generates:
 
-**NEW in 0.512 Beta:** Visual activation zone overlay on GPX maps - see exactly where the activation zone is!
+* An interactive GPX track map with three selectable base layers (Topographic, OpenStreetMap, Minimal)
+* An elevation profile chart with hover-to-map interaction
+* A "Zoom to Activation Zone" button showing the precise activation boundary
+* Hiking statistics: time, distance, elevation gain/loss, average speed, and peak elevation
+* A contacts table with automatic Summit-to-Summit (S2S) highlighting
+* An interactive contact map showing where your QSOs were located
+
+**No other plugins required.** All map libraries (Leaflet 1.9.4, Chart.js 4.4.0) are bundled with the plugin.
 
 = Features =
 
-* **GPX Track Visualization** - Upload and display your activation GPS tracks with interactive maps
-* **Visual Activation Zone Overlay** - Red polygon/circle overlaid on map showing the exact activation zone
-* **Intelligent Track Analysis** - Automatically calculates hiking time vs. summit activation time
-* **Activation.Zone API Integration** - Uses N6ARA's activation.zone API for precise activation zone based on 25m elevation drop (per SOTA rules)
-* **Automatic Fallback** - Falls back to radius method if API unavailable (shown as dashed orange circle)
-* **Summit Peak Marker** - 🏔️ marker shows the highest point in your track
-* **Activation Zone Detection** - Accurately identifies when you're at the summit vs. hiking
-* **Rest Break Tracking** - Tracks rest breaks separately but includes them in hiking time
-* **Activity Statistics** - Display hiking distance, elevation gain/loss, speeds, and time breakdowns
-* **Metric or Imperial Units** - Choose your preferred unit system (km/m or mi/ft)
-* **Contact Log Tables** - Beautiful, responsive tables showing all your activation contacts
-* **Summit-to-Summit (S2S) Highlighting** - Automatic detection and highlighting of S2S contacts
-* **Interactive Contact Map** - Visual map showing where your contacts are located
-* **QRZ Integration** - Automatic location lookup for contacts via QRZ.com API
-* **Fully Customizable** - Customize colors, fonts, headlines, and display options
-* **Responsive Design** - Tables automatically adapt to mobile devices with horizontal scrolling
-* **Block Editor Compatible** - Easy-to-use Gutenberg block for adding SOTA data
-* **Transparent Background Option** - Blend seamlessly with your theme
+* **Standalone GPX Map** — Interactive Leaflet map with Topographic, OpenStreetMap, and CartoDB Minimal base layers
+* **Elevation Chart** — Profile chart below the map; hover to see a position dot track across the map
+* **Activation Zone Overlay** — Precise terrain-based polygon from the Activation.Zone API (by N6ARA), or a radius circle fallback
+* **Zoom to Activation Zone** — One-click button to zoom the map to the activation zone boundary
+* **Summit Peak Marker** — 🏔️ marker at the highest point in your track
+* **Intelligent Track Analysis** — Automatically calculates hiking time vs. activation time using the Activation.Zone API or a configurable radius fallback
+* **Rest Break Tracking** — Tracked separately and shown as a sub-note under hiking time
+* **Metric or Imperial Units** — Choose km/m/km/h or mi/ft/mph in settings
+* **Contact Log Tables** — Responsive, horizontally-scrollable tables showing all contacts
+* **S2S Highlighting** — Automatic detection and custom color highlighting for Summit-to-Summit contacts
+* **Interactive Contact Map** — Shows contact locations by band, with lines to the summit; S2S contacts use SOTA API coordinates, regular contacts use QRZ.com lookups
+* **Maidenhead Grid Support** — Contacts with a grid square in the comments field are plotted automatically
+* **Fully Customizable** — Colors, fonts, headlines, and display options in Settings → SOTA Magic
+* **Block Editor Compatible** — Simple Gutenberg block with file upload and manual override fields
+* **Responsive Design** — Works on mobile and desktop
 
-= How It Works - The Methodology =
+= How Activation Time is Calculated =
 
-**GPX Track Analysis Algorithm:**
+The plugin uses two methods to determine the activation zone, applied in priority order:
 
-The plugin uses an intelligent hybrid approach with two methods for determining the activation zone:
-
-**Method 1: Activation.Zone API (Primary - Most Accurate)**
-
-When enabled (default), the plugin queries activation.zone (created by N6ARA) for the precise activation zone geometry:
-
-1. **Extract Summit Reference** - Gets the summit reference (e.g., W6/CC-001) from your CSV file
-2. **Query API** - Sends summit coordinates and elevation to api.activation.zone
-3. **Receive Polygon** - Gets back the exact activation zone boundary based on terrain elevation data
-4. **Point-in-Polygon Check** - Uses ray-casting algorithm to determine if each GPS point is within the zone
-
-This method uses actual terrain data and the official SOTA rule of 25 meters vertical drop from the summit peak, providing the most accurate activation zone possible.
+**Method 1: Activation.Zone API (Primary)**
+Queries api.activation.zone (by N6ARA) using your summit reference from the CSV file. The API returns a precise polygon based on terrain elevation data and the official SOTA 25m vertical drop rule. All time spent inside this polygon counts as activation time.
 
 **Method 2: Radius Fallback (Automatic)**
-
-If the API is disabled or unavailable, the plugin automatically falls back to a simpler method:
-
-1. **Summit Peak Detection**
-   - Analyzes your entire GPX track to find the highest elevation point
-   - This point is assumed to be at or very near the SOTA summit
-   - Coordinates of this peak become the center of the "activation zone"
-
-2. **Activation Zone Definition**
-   - Creates a circular zone around the summit peak (default: 50 meters radius)
-   - This is configurable in settings (20-200 meters)
-   - Any time spent stationary within this zone is classified as "Activation Time"
-
-**Rest Break Tracking:**
-
-3. **Rest Break Filtering**
-   - All stationary time outside the activation zone is counted as hiking time
-   - Rest breaks are tracked separately and shown as a sub-note
-   - This ensures complete time accounting
-
-4. **Speed-Based Movement Detection**
-   - Movement between GPS points is analyzed for speed
-   - Below threshold (default 0.3 km/h) = stationary
-   - Above threshold = hiking/moving
-
-5. **Time Classification**
-   - **Hiking Time:** All time outside the activation zone (moving + rest breaks)
-   - **Activation Time:** Stationary time within activation zone
-   - **Rest Breaks:** Tracked separately and shown as sub-note under hiking time
-   
-   This ensures your total time is fully accounted for, with rest breaks properly attributed to hiking time rather than being lost or excluded.
-
-**Contact Map Location Sources:**
-
-Contact locations are determined using multiple data sources:
-
-1. **Summit-to-Summit (S2S) Contacts:**
-   - Exact summit coordinates retrieved from SOTA API (api2.sota.org.uk)
-   - Provides precise location of the other activator's summit
-   - No QRZ lookup required for S2S contacts
-
-2. **Regular Contacts:**
-   - Station location from QRZ.com XML API
-   - Uses latitude/longitude from operator's QRZ profile
-   - Requires valid QRZ.com credentials (XML subscription)
-   - Rate-limited to 0.5 seconds between lookups to respect QRZ terms
-
-3. **Fallback:**
-   - If location data is unavailable, contact won't appear on map
-   - Contact will still appear in the contacts table
-
-**Distance and Elevation Calculations:**
-
-- Uses Haversine formula for accurate great-circle distances
-- Accounts for Earth's curvature (essential for longer hikes)
-- Elevation data comes directly from GPX track points
-- All conversions between metric/imperial use standard factors:
-  - 1 km = 0.621371 miles
-  - 1 meter = 3.28084 feet
-
-= How GPX Analysis Works =
-
-The plugin analyzes your GPS track to intelligently distinguish between:
-- **Hiking Time**: Periods when you're moving above a configurable speed threshold (default: 0.3 km/h)
-- **Activation Time**: Stationary periods when you're operating your radio
-- **Total Statistics**: Complete breakdown of distance, elevation, and time
-
-The analysis displays:
-- Hiking time and distance
-- Activation (stationary) time
-- Total time and distance
-- Elevation gain and loss
-- Average hiking speed
-- Peak and base elevations
-
-= How to Use =
-
-1. Install and activate the plugin
-2. Go to Settings → SOTA Magic to configure your preferences
-3. In any post or page, add the "SOTA DATA" block
-4. Upload your GPX file (GPS track) and/or CSV file (contacts)
-5. Publish and view your activation data with statistics!
+If the API is disabled or unavailable, the plugin draws a configurable circle (default 50m) around the highest GPS point. Configurable in Settings → SOTA Magic (20–200m).
 
 = CSV Format =
 
-The plugin expects SOTA CSV v2 format with the following columns:
-V2, MyCall, MySummit, Date (DD/MM/YY), Time, Frequency, Mode, TheirCall, TheirSummit, Comments
+The plugin expects SOTA CSV v2 format:
+`V2, MyCall, MySummit, Date (DD/MM/YY), Time, Frequency, Mode, TheirCall, TheirSummit, Comments`
 
 = Requirements =
 
-* WP GPX Maps plugin (for GPX track visualization)
-* QRZ.com account (optional, for contact mapping feature)
+* WordPress 6.0 or later
+* PHP 7.4 or later
+* QRZ.com XML subscription (optional — only needed for contact map location lookups)
 
 == Installation ==
 
@@ -155,378 +69,168 @@ V2, MyCall, MySummit, Date (DD/MM/YY), Time, Frequency, Mode, TheirCall, TheirSu
 1. Log in to your WordPress admin panel
 2. Navigate to Plugins → Add New
 3. Search for "SOTA Magic"
-4. Click "Install Now" and then "Activate"
+4. Click "Install Now" then "Activate"
 
 = Manual Installation =
 
 1. Download the plugin zip file
-2. Log in to your WordPress admin panel
-3. Navigate to Plugins → Add New → Upload Plugin
-4. Choose the downloaded zip file and click "Install Now"
-5. Activate the plugin
+2. Navigate to Plugins → Add New → Upload Plugin
+3. Upload the zip and click "Install Now"
+4. Activate the plugin
 
 = After Installation =
 
-1. Go to Settings → SOTA Magic
-2. Configure your preferences (headlines, colors, etc.)
-3. Enable "Show GPX Statistics" to display hiking/activation analysis
-4. Adjust the stationary speed threshold if needed (default: 0.3 km/h works well)
-5. If using the contact map feature, enter your QRZ.com username and password
-6. Start adding SOTA data blocks to your posts and pages!
+1. Go to Settings → SOTA Magic and configure your preferences
+2. In any post or page, add the "SOTAMAGIC" Gutenberg block
+3. Upload your GPX file and/or SOTA CSV file
+4. Publish or preview — your activation data appears automatically
 
 == Frequently Asked Questions ==
 
-= What file formats does the plugin support? =
+= Do I need any other plugins? =
 
-The plugin supports GPX files for GPS tracks and CSV files for contact logs. The CSV should be in SOTA CSV v2 format.
+No. As of version 1.0.0, SOTA Magic is fully standalone. All mapping libraries are bundled with the plugin. No WP GPX Maps or any other plugin is required.
 
 = How does the plugin determine hiking vs. activation time? =
 
-The plugin uses two methods to determine the activation zone:
+**Primary method — Activation.Zone API:**
+Queries api.activation.zone (by N6ARA) for a precise terrain-based zone polygon. Requires a summit reference in your CSV file. All time inside the polygon = activation time.
 
-**Primary Method: Activation.Zone API (Most Accurate)**
-- Queries api.activation.zone (by N6ARA) for precise zone geometry
-- Uses actual terrain elevation data and SOTA's 25m vertical drop rule
-- Provides the most accurate activation zone possible
-- Enabled by default, can be disabled in settings
+**Fallback method — Radius approximation:**
+A circle of configurable radius (default 50m) around the highest GPS point. Used automatically if the API is disabled or unavailable.
 
-**Fallback Method: Radius Approximation**
-- Uses a configurable radius (default 50m) around highest GPS point
-- Automatically used if API is disabled or unavailable
-- Still quite accurate for most activations
+= What is Activation.Zone? =
 
-Time spent stationary within the activation zone = activation time. All other time = hiking time (including rest breaks, which are tracked separately).
+Activation.Zone is a free tool by N6ARA that calculates the precise SOTA activation zone for any summit using Digital Elevation Model (DEM) data and the official 25m vertical drop rule. SOTA Magic integrates with their public API. No account required.
 
-= What is activation.zone and how does it work? =
+= What if the Activation.Zone API is unavailable? =
 
-Activation.zone is a tool created by N6ARA (Ara) that calculates the precise SOTA activation zone for any summit. It uses Digital Elevation Model (DEM) data to find all points within 25 meters vertical drop from the summit peak, following official SOTA rules. Our plugin integrates with their API to get this precise geometry for your activations.
+The plugin automatically falls back to the radius method. Statistics are still calculated; the activation zone will show as an orange dashed circle instead of a red polygon.
 
-= Do I need an activation.zone account? =
+= Do I need a QRZ subscription? =
 
-No! The activation.zone API is publicly available and doesn't require an account. The plugin automatically queries it when you have both a GPX file and CSV file with summit reference.
+Only for the contact map location feature. QRZ XML access is included with QRZ Logbook and XML subscriptions (not the free account). S2S contacts are located via the SOTA API and do not require QRZ.
 
-= What if the activation.zone API is down? =
+= Can I use Maidenhead grid squares for contact locations? =
 
-The plugin automatically falls back to the radius method (50m circle around highest point). Your statistics will still calculate, just with slightly less precision. You can also manually disable the API in settings if you prefer to always use the radius method.
+Yes. If a 4- or 6-character grid square appears anywhere in the contact's Comments field, SOTA Magic will use it to plot the contact on the map. This works without QRZ credentials.
 
-= Can I see the activation zone on the map? =
+= Can I override the calculated statistics? =
 
-Yes! Version 0.512+ overlays the activation zone directly on your GPX map:
+Yes. The SOTAMAGIC block editor panel includes manual override fields for hiking distance, hiking time, activation time, rest breaks, and total time. Check the box next to a field to enable the override.
 
-- **Red polygon with solid line**: Precise zone from activation.zone API
-- **Orange circle with dashed line**: Fallback radius estimate
-- **🏔️ marker**: Shows the summit peak (highest point in your track)
+= Can I force the radius method instead of the API? =
 
-Click on the overlay to see details about the activation zone. This visual confirmation helps you verify where you operated from and understand the zone boundaries.
+Yes. In the block editor, check "Activation Zone: Radius-based (API skipped)" in the Manual Overrides panel. Or disable the API globally in Settings → SOTA Magic.
 
-= Why are there two different overlay styles? =
+= Can I use multiple blocks on one page? =
 
-The red solid polygon appears when the activation.zone API successfully returns the precise terrain-based activation zone. The orange dashed circle appears when using the fallback radius method (either because the API is disabled or unavailable). This visual distinction helps you understand which method was used for the analysis.
-
-= The activation zone overlay doesn't appear on my map. How can I troubleshoot? =
-
-1. **Check browser console** (F12 → Console tab) for "SOTA Magic" messages
-2. **Look for errors** - the console will show what's happening
-3. **Verify WP GPX Maps is installed and active**
-4. **Try refreshing** the page - sometimes the map loads slowly
-5. **Check GPX stats are enabled** in Settings → SOTA Magic
-
-The console will show messages like:
-- "SOTA Magic: Found map via _wpgpxmaps" = Working correctly
-- "Could not find Leaflet map" = WP GPX Maps might not be loaded
-
-If you see errors, please report them with the console output for support.
-
-= Why are rest breaks included in hiking time? =
-
-Rest breaks are part of your hiking experience! Whether you stop for water, photos, or to catch your breath, that time is still part of your overall hike to the summit. The plugin tracks rest breaks separately and displays them as a sub-note (e.g., "2h 15m (25m breaks)") so you can see the breakdown while keeping your total hiking time accurate.
-
-= What's the difference between a rest break and activation time? =
-
-- **Rest break:** Stationary time outside the activation zone (on the trail)
-- **Activation time:** Stationary time within the activation zone (at the summit)
-
-The key difference is location - activation time is specifically when you're stationary at or near the summit peak, where you're operating your radio.
-
-= Why use activation zone instead of just speed? =
-
-The activation zone method is much more accurate because:
-- It identifies where you actually operated from (at the summit)
-- It ignores brief rest stops during the hike up or down
-- It prevents long lunch breaks on the trail from counting as "activation"
-- It's based on the physical location where SOTA activations occur
-
-= Can I adjust the activation zone settings? =
-
-Yes! Go to Settings → SOTA Magic → GPX Track Analysis:
-- **Activation Zone Radius:** 20-200 meters (default: 50m)
-- **Rest Break Threshold:** 1-30 minutes (default: 10 min)
-- **Stationary Speed Threshold:** 0.1-2.0 km/h (default: 0.3 km/h)
-
-= What if my GPX track doesn't reach the actual summit? =
-
-The plugin uses the highest point in your track, so it will still work. The activation zone will be centered on the highest point you reached, which is typically at or very near the summit.
-
-= How accurate is the activation zone method? =
-
-Very accurate for typical SOTA activations! The 50-meter radius captures the area where most activators set up. If you operate from a different location (e.g., slightly below the peak), you can increase the radius in settings.
+Yes. Each SOTAMAGIC block is fully independent. Multiple activations can appear on the same post or page.
 
 = Can I switch between metric and imperial units? =
 
-Yes! Go to Settings → SOTA Magic → GPX Track Analysis and choose your preferred "Unit System". Select Metric for km, m, and km/h, or Imperial for mi, ft, and mph. All statistics will automatically convert to your chosen system.
+Yes — Settings → SOTA Magic → Unit System. All statistics and the elevation chart convert automatically.
 
-= How are contact locations determined on the map? =
+= Can I customize the appearance? =
 
-Contact locations come from different sources:
-
-**Summit-to-Summit (S2S) contacts:** Exact summit coordinates from the SOTA API (api2.sota.org.uk). These are very accurate.
-
-**Regular contacts:** Station location from the operator's QRZ.com profile. Requires your QRZ username and password in settings.
-
-**No location:** If a contact isn't S2S and doesn't have location data in QRZ, they won't appear on the map (but will still show in the contact table).
-
-= Do I need a QRZ subscription for the contact map? =
-
-You need a QRZ.com account with XML access. This is included with QRZ Logbook subscriptions and XML subscriptions. The free QRZ account does not include XML API access.
-
-= Why don't all my contacts show on the map? =
-
-Contacts will only appear if:
-1. They're S2S contacts (location from SOTA API), OR
-2. They have location data in their QRZ profile AND you have QRZ XML access
-
-Some operators don't include precise coordinates in their QRZ profiles, so they won't appear on the map.
-
-= Do I need the WP GPX Maps plugin? =
-
-Yes, WP GPX Maps is required for displaying GPX track visualizations. The contact table, statistics, and map features work independently.
-
-= How do I get my contacts to show on the map? =
-
-Enable the contact map in Settings → SOTA Magic and enter your QRZ.com credentials. The plugin will automatically look up contact locations.
-
-= Can I customize the colors and appearance? =
-
-Yes! Go to Settings → SOTA Magic to customize background colors, text colors, S2S highlighting colors, and more. You can also use transparent backgrounds to match your theme.
-
-= What is S2S highlighting? =
-
-Summit-to-Summit (S2S) contacts are when you contact another station that's also activating a SOTA summit. The plugin automatically detects these from your CSV and highlights them with custom colors.
-
-= The comments field is cut off in my table. What should I do? =
-
-As of version 5.07, the plugin includes responsive table design with horizontal scrolling. Long comments will wrap within the column, and the entire table scrolls horizontally if needed on narrow screens.
-
-= Can I disable the GPX statistics? =
-
-Yes, go to Settings → SOTA Magic → GPX Track Analysis and uncheck "Show GPX Statistics" if you prefer not to display the analysis.
-
-= Can I use this plugin on multiple posts/pages? =
-
-Yes! You can add the SOTA DATA block to as many posts and pages as you like, each with different GPX and CSV files.
+Yes — Settings → SOTA Magic lets you set background color, text color, transparent background, S2S highlight colors, and whether to use your theme's font.
 
 == Screenshots ==
 
-1. SOTA Magic settings page with customization options
-2. GPX track visualization with hiking/activation statistics
-3. Statistics grid showing hiking time, activation time, and elevation data
-4. Contact table with S2S highlighting
-5. Interactive contact map showing QSO locations
-6. Block editor interface for uploading files
+1. GPX track map with elevation chart and "Zoom to Activation Zone" button
+2. Hiking statistics grid showing time, distance, elevation, and speed
+3. Contact table with S2S highlighting
+4. Interactive contact map showing QSO locations by band
+5. Block editor interface with file upload and manual override panel
+6. Settings page
 
 == Changelog ==
 
-= 0.517 Beta =
-* NEW: Methodology indicator on Activation Time stat
-* NEW: Shows "✓ API-based zone" when using activation.zone API
-* NEW: Shows "Within XXm of summit" when using radius fallback
-* NEW: Detailed explanation box below stats explaining which method was used
-* NEW: Links to activation.zone and suggests enabling API if using fallback
-* Improved: Users can now see how their activation time was calculated
-* Enhanced: Tooltips on methodology indicators
+= 1.0.0 =
+* MAJOR: Plugin is now fully standalone — no other plugins required
+* NEW: Self-contained Leaflet 1.9.4 map replaces WP-GPX Maps dependency
+* NEW: Elevation profile chart (Chart.js 4.4.0) below the map with hover-to-map interaction
+* NEW: "Zoom to Activation Zone" button above the map
+* NEW: Three selectable base layers — Topographic, OpenStreetMap, CartoDB Minimal
+* NEW: Activation zone overlay uses precise red polygon (API) or orange circle (fallback)
+* IMPROVED: All map libraries (Leaflet, Chart.js) bundled locally — no CDN calls
+* IMPROVED: GPX track points sampled to max 800 for efficient JSON delivery
+* IMPROVED: Summit coordinates fall back to highest track point when CSV is absent
+* FIXED: Removed all dependency on WP-GPX Maps plugin
+* FIXED: Decimal-precision hack and .wpgpxmaps CSS workarounds removed
 
-= 0.516 Beta - STABLE BASELINE =
-* FIXED: Removed all visual overlay code causing JavaScript errors
-* FIXED: No more "Invalid character: '#'" errors in Safari
-* Status: Fully stable and working version
-* Core Features: All activation.zone API integration working perfectly
-* Core Features: Accurate time calculations (hiking vs activation)
-* Core Features: Rest break tracking included in hiking time
-* Core Features: All statistics displaying correctly
-* Note: Visual map overlay temporarily removed - will be re-added with different approach
+= 0.607 Beta =
+* Manual override fields for hiking distance, time, activation time, rest breaks, total time
+* Force-radius toggle to skip activation.zone API per block
+* Help modal explaining how each statistic is calculated
+* Debug mode for admins showing API call results
+
+= 0.517 Beta =
+* Methodology indicator on Activation Time stat box
+* Shows API-based vs radius method in the UI
+* Links to activation.zone when API is active
 
 = 0.512 Beta =
-* NEW: Visual activation zone overlay on GPX maps
-* NEW: Red polygon overlay when using activation.zone API
-* NEW: Orange dashed circle overlay when using radius fallback
-* NEW: Summit peak marker (🏔️) on map at highest point
-* NEW: Clickable overlays with information popups
-* Improved: Can now visually verify activation zone on map
-* Enhanced: Better understanding of where you operated from
-* Technical: Leaflet integration with WP GPX Maps
+* Visual activation zone overlay on GPX maps (via WP-GPX Maps + Leaflet interception)
+* Red polygon when using activation.zone API; orange dashed circle for radius fallback
+* Summit peak 🏔️ marker on map
 
 = 0.511 Beta =
-* MAJOR: Integration with activation.zone API (by N6ARA)
-* NEW: Queries api.activation.zone for precise activation zone geometry based on terrain
-* NEW: Uses official SOTA 25m vertical drop rule via API
-* NEW: Automatic fallback to radius method if API unavailable
-* NEW: Point-in-polygon algorithm for accurate zone detection
-* NEW: Setting to enable/disable API usage (enabled by default)
-* Improved: Most accurate activation zone detection possible
-* Enhanced: Settings page explains API vs. fallback method
-* Added: Credits to N6ARA for activation.zone tool
+* Integration with activation.zone API (by N6ARA)
+* Point-in-polygon algorithm for accurate zone detection
+* Automatic fallback to radius method
 
 = 0.510 Beta =
-* FIXED: Rest breaks now properly included in hiking time (not excluded)
-* NEW: Rest break time tracked separately and shown as sub-note under hiking time
-* NEW: Display format: "2h 15m (25m breaks)" shows total hiking with break breakdown
-* Improved: All time now accounted for - hiking time + activation time = total time
-* Improved: More intuitive time classification that matches real hiking experience
-* Enhanced: Settings page clarifies that rest breaks are included in hiking time
-* Updated: Documentation reflects new rest break handling
+* Rest breaks now included in hiking time with separate sub-note display
+* All time properly accounted for across hiking + activation + rest
 
 = 0.509 Beta =
-* MAJOR: Complete rewrite of GPX analysis algorithm
-* NEW: Activation zone detection using summit peak location
-* NEW: Configurable activation zone radius (20-200m, default 50m)
-* NEW: Rest break filtering - ignores brief stops during hiking
-* NEW: Configurable rest threshold (1-30 minutes, default 10 min)
-* NEW: Comprehensive documentation explaining all methodology
-* NEW: Settings page includes detailed explanations of how calculations work
-* Improved: Much more accurate distinction between hiking and activation time
-* Improved: Eliminates false positives from photo stops and water breaks
-* Enhanced: Better handling of complex hiking patterns
-* Changed: Version numbering to 0.509 Beta to reflect development status
+* Complete rewrite of GPX analysis algorithm
+* Activation zone detection using summit peak location
+* Configurable activation zone radius and rest break threshold
 
-= 5.09 =
-* NEW: Metric/Imperial unit system preference
-* NEW: All statistics now display in your chosen unit system
-* NEW: Setting to switch between km/m/km/h and mi/ft/mph
-* Improved: Better international support for different measurement preferences
-* Enhanced: Automatic unit conversion throughout the plugin
+= 0.508 Beta =
+* Intelligent GPX track analysis: hiking vs activation time
+* Statistics grid with icons
+* Configurable stationary speed threshold
 
-= 5.08 =
-* NEW: Intelligent GPX track analysis distinguishing hiking from activation time
-* NEW: Comprehensive statistics display including:
-  - Hiking time and distance
-  - Activation (stationary) time
-  - Total time and distance
-  - Elevation gain and loss
-  - Average hiking speed
-  - Peak and base elevations
-* NEW: Configurable stationary speed threshold (default: 0.3 km/h)
-* NEW: Option to show/hide GPX statistics in settings
-* NEW: Beautiful grid layout for statistics with icons
-* Improved: Better responsive design for statistics on mobile
-* Enhanced: More detailed activity breakdown for activators
-
-= 5.07 =
-* Fixed: Comments column now wraps text properly instead of being cut off
-* Added: Responsive table wrapper with horizontal scrolling
-* Improved: Better mobile display for contact tables
-* Enhanced: Table styling for better readability on all screen sizes
-
-= 5.06 =
-* Previous stable version
-* Full feature set including GPX maps, contact tables, and contact mapping
+= 0.507 Beta =
+* Responsive table design with horizontal scrolling
+* Long comments wrap within column
 
 == Upgrade Notice ==
 
-= 0.510 Beta =
-Important update: Rest breaks are now properly included in hiking time! This version fixes the time accounting so all time is properly categorized. Your hiking time will now include rest breaks (with the break time shown as a helpful sub-note), making the total time calculation accurate and complete.
+= 1.0.0 =
+Major release. The WP-GPX Maps plugin dependency has been completely removed. If you had WP-GPX Maps installed only for SOTA Magic, you may now deactivate it. All map and chart functionality is now built in.
 
-= 0.509 Beta =
-MAJOR UPDATE: Complete rewrite of the activation time detection algorithm! Now uses activation zone method based on summit peak location for much more accurate results. This beta version introduces powerful new features including configurable activation zone radius and rest break filtering. Highly recommended for all SOTA activators who want the most accurate hiking vs. activation analysis.
+== External Services ==
 
-= 5.07 =
-This version fixes the issue where long comments were being cut off in the contact table. Recommended upgrade for all users.
+This plugin connects to the following external services. By using this plugin you agree to their respective terms.
 
-== Additional Information ==
+**SOTA API** (api2.sota.org.uk)
+Used to retrieve official summit coordinates (for the summit marker and S2S contact locations). No authentication required. No personal data is sent.
+Terms: https://www.sota.org.uk
 
-= Support =
+**Activation.Zone API** (api.activation.zone)
+Used to retrieve the precise SOTA activation zone polygon for a given summit reference. No authentication required. The summit reference, coordinates, and elevation are sent to the API. Created by N6ARA.
+Terms: https://activation.zone
 
-For support, feature requests, or bug reports, please visit the plugin's support forum or contact KI6CR.
+**QRZ.com XML API** (xmldata.qrz.com)
+Used to look up contact operator locations for the contact map. Only contacted when the contact map is enabled and QRZ credentials are provided in settings. Your QRZ username and password are sent to QRZ.com for authentication.
+Terms: https://www.qrz.com/page/terms_of_service.html
 
-= Credits =
+**OpenStreetMap tile servers** ({s}.tile.openstreetmap.org)
+Used as a base map layer option. Standard tile requests including your IP address are sent to OpenStreetMap servers.
+Terms: https://wiki.osmfoundation.org/wiki/Terms_of_Use
 
-Created by KI6CR for the amateur radio and SOTA community.
+**OpenTopoMap tile servers** ({s}.tile.opentopomap.org)
+Used as the default base map layer (topographic). Standard tile requests are sent to OpenTopoMap servers.
+Terms: https://opentopomap.org/about
 
-= Contributing =
-
-This plugin is open to contributions and improvements from the ham radio community.
+**CartoDB/CARTO tile servers** ({s}.basemaps.cartocdn.com)
+Used as a minimal base map layer option. Standard tile requests are sent to CARTO servers.
+Terms: https://carto.com/legal/
 
 == Privacy Policy ==
 
-SOTA Magic does not collect or store any user data. If you enable the contact map feature and provide QRZ.com credentials, those credentials are stored in your WordPress database and used only to query the QRZ.com API for contact location data. No data is sent to third parties except QRZ.com when the contact map feature is enabled.
-
-== Technical Details ==
-
-= GPX Analysis Algorithm =
-
-The plugin implements a sophisticated two-pass analysis of GPX tracks:
-
-**Pass 1: Summit Detection**
-- Parses all trackpoints from the GPX file
-- Identifies the highest elevation point in the track
-- Records coordinates of this peak as the summit center
-
-**Pass 2: Segment Classification**
-- Calculates distance between consecutive points using Haversine formula
-- Determines speed for each segment (distance/time)
-- Checks if each point falls within the activation zone radius
-- Classifies segments based on location and movement:
-  * In activation zone + stationary = Activation Time
-  * Outside zone + moving = Hiking Time
-  * Outside zone + stationary = Hiking Time (counted as rest break)
-- Rest breaks are tracked separately but included in total hiking time
-- Display shows: "Hiking Time: 2h 15m (25m breaks)" for complete transparency
-
-**Haversine Distance Formula:**
-The plugin uses the Haversine formula to calculate great-circle distances between GPS coordinates, accounting for the Earth's spherical shape. This provides accuracy within a few meters for the distances typical in SOTA activations.
-
-**Activation Zone Geometry:**
-Unlike the full SOTA activation zone (which uses 25m vertical drop from peak based on terrain), this plugin uses a simpler horizontal radius approach. This is a practical compromise that works well for most summits while avoiding the need for Digital Elevation Model (DEM) data.
-
-= Performance =
-
-GPX analysis is performed during page rendering. Performance characteristics:
-
-- **Typical activation (500-1000 points):** <1 second processing time
-- **Long hikes (2000+ points):** 1-3 seconds processing time
-- **Memory usage:** Minimal - points are processed sequentially
-- **No caching:** Results are calculated fresh each page load
-
-For very long tracks, consider splitting the GPX file to only include the activation portion.
-
-= API Usage =
-
-**SOTA API (api2.sota.org.uk):**
-- Used to retrieve summit coordinates for contact mapping
-- No authentication required
-- Rate limiting: None specified, plugin uses reasonable delays
-- Endpoint: `/api/summits/{summit_reference}`
-
-**QRZ.com XML API:**
-- Used to retrieve operator location data for contact mapping
-- Requires XML subscription (not included with free accounts)
-- Rate limiting: 0.5 seconds between requests (enforced by plugin)
-- Session-based authentication using username/password
-
-= Browser Compatibility =
-
-The plugin uses standard WordPress/PHP server-side rendering with minimal JavaScript:
-- Compatible with all modern browsers
-- JavaScript only used for: 
-  * Leaflet maps (contact map feature)
-  * Minor UI enhancements (decimal precision fixes)
-- Works with JavaScript disabled (except interactive maps)
-
-= Data Privacy =
-
-- All GPX processing happens on your WordPress server
-- No GPX data is sent to external services
-- QRZ credentials stored in WordPress options table
-- No tracking or analytics
-- No data sent to third parties except:
-  * SOTA API for summit coordinates
-  * QRZ API for contact locations (only if feature enabled)
+SOTA Magic does not collect, store, or transmit any personal data beyond what is described in the External Services section above. GPX files and CSV files are stored in your WordPress media library and processed on your own server. QRZ.com credentials are stored in your WordPress options table and are never transmitted to anyone other than QRZ.com.

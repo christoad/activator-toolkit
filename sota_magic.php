@@ -1,9 +1,17 @@
 <?php
 /**
  * Plugin Name: SOTA Magic
- * Description: Block-based SOTA data uploader with GPX maps and contact tables
- * Version: 0.607 Beta
- * Author: Created by KI6CR
+ * Plugin URI: https://ki6cr.com
+ * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
+ * Version: 1.0.0
+ * Author: KI6CR
+ * Author URI: https://ki6cr.com
+ * License: GPLv2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: sota-magic
+ * Requires at least: 6.0
+ * Tested up to: 6.9
+ * Requires PHP: 7.4
  */
 
 if (!defined('ABSPATH')) exit;
@@ -53,10 +61,20 @@ add_action('admin_init', function() {
         'sota_activation_zone_radius' => '50',
         'sota_rest_threshold_minutes' => '3',
         'sota_use_azapi' => 1,
-        'sota_debug_mode' => 0
+        'sota_debug_mode' => 0,
+        'sota_default_map_layer' => 'topo'
     ];
+    $color_keys   = ['sota_bg_color', 'sota_text_color', 'sota_s2s_highlight', 'sota_s2s_text_color'];
+    $boolean_keys = ['sota_is_transparent', 'sota_use_theme_font', 'sota_show_contact_map', 'sota_show_gpx_stats', 'sota_use_azapi', 'sota_debug_mode'];
     foreach ($options as $key => $default) {
-        register_setting('sota_magic_group', $key);
+        if (in_array($key, $color_keys, true)) {
+            $sanitize = 'sanitize_hex_color';
+        } elseif (in_array($key, $boolean_keys, true)) {
+            $sanitize = 'absint';
+        } else {
+            $sanitize = 'sanitize_text_field';
+        }
+        register_setting('sota_magic_group', $key, ['sanitize_callback' => $sanitize]);
         if (get_option($key) === false) update_option($key, $default);
     }
 });
@@ -66,31 +84,32 @@ function sota_magic_settings_page() {
     
     if (isset($_POST['sota_magic_save'])) {
         check_admin_referer('sota_magic_settings');
-        update_option('sota_headline_gpx', sanitize_text_field($_POST['sota_headline_gpx']));
-        update_option('sota_headline_csv', sanitize_text_field($_POST['sota_headline_csv']));
-        update_option('sota_headline_map', sanitize_text_field($_POST['sota_headline_map']));
-        update_option('sota_bg_color', sanitize_hex_color($_POST['sota_bg_color']));
-        update_option('sota_text_color', sanitize_hex_color($_POST['sota_text_color']));
+        update_option('sota_headline_gpx', sanitize_text_field(wp_unslash($_POST['sota_headline_gpx'] ?? '')));
+        update_option('sota_headline_csv', sanitize_text_field(wp_unslash($_POST['sota_headline_csv'] ?? '')));
+        update_option('sota_headline_map', sanitize_text_field(wp_unslash($_POST['sota_headline_map'] ?? '')));
+        update_option('sota_bg_color', sanitize_hex_color(wp_unslash($_POST['sota_bg_color'] ?? '')));
+        update_option('sota_text_color', sanitize_hex_color(wp_unslash($_POST['sota_text_color'] ?? '')));
         update_option('sota_is_transparent', isset($_POST['sota_is_transparent']) ? 1 : 0);
         update_option('sota_use_theme_font', isset($_POST['sota_use_theme_font']) ? 1 : 0);
-        update_option('sota_s2s_highlight', sanitize_hex_color($_POST['sota_s2s_highlight']));
-        update_option('sota_s2s_text_color', sanitize_hex_color($_POST['sota_s2s_text_color']));
+        update_option('sota_s2s_highlight', sanitize_hex_color(wp_unslash($_POST['sota_s2s_highlight'] ?? '')));
+        update_option('sota_s2s_text_color', sanitize_hex_color(wp_unslash($_POST['sota_s2s_text_color'] ?? '')));
         update_option('sota_show_contact_map', isset($_POST['sota_show_contact_map']) ? 1 : 0);
-        update_option('sota_qrz_username', sanitize_text_field($_POST['sota_qrz_username']));
-        update_option('sota_qrz_password', sanitize_text_field($_POST['sota_qrz_password']));
+        update_option('sota_qrz_username', sanitize_text_field(wp_unslash($_POST['sota_qrz_username'] ?? '')));
+        update_option('sota_qrz_password', sanitize_text_field(wp_unslash($_POST['sota_qrz_password'] ?? '')));
         update_option('sota_show_gpx_stats', isset($_POST['sota_show_gpx_stats']) ? 1 : 0);
-        update_option('sota_stationary_threshold', sanitize_text_field($_POST['sota_stationary_threshold']));
-        update_option('sota_unit_system', sanitize_text_field($_POST['sota_unit_system']));
-        update_option('sota_activation_zone_radius', sanitize_text_field($_POST['sota_activation_zone_radius']));
-        update_option('sota_rest_threshold_minutes', sanitize_text_field($_POST['sota_rest_threshold_minutes']));
+        update_option('sota_stationary_threshold', sanitize_text_field(wp_unslash($_POST['sota_stationary_threshold'] ?? '')));
+        update_option('sota_unit_system', sanitize_text_field(wp_unslash($_POST['sota_unit_system'] ?? '')));
+        update_option('sota_activation_zone_radius', sanitize_text_field(wp_unslash($_POST['sota_activation_zone_radius'] ?? '')));
+        update_option('sota_rest_threshold_minutes', sanitize_text_field(wp_unslash($_POST['sota_rest_threshold_minutes'] ?? '')));
         update_option('sota_use_azapi', isset($_POST['sota_use_azapi']) ? 1 : 0);
         update_option('sota_debug_mode', isset($_POST['sota_debug_mode']) ? 1 : 0);
+        update_option('sota_default_map_layer', sanitize_text_field(wp_unslash($_POST['sota_default_map_layer'] ?? 'topo')));
         echo '<div class="notice notice-success"><p>Settings saved!</p></div>';
     }
     ?>
     <div class="wrap">
         <h1>🏔️ SOTA Magic Settings</h1>
-        <p style="font-size:12px;color:#666;"><em>Created by KI6CR - Version 0.607 Beta</em></p>
+        <p style="font-size:12px;color:#666;"><em>Created by KI6CR - Version 1.0.0</em></p>
         
         <form method="post" action="">
             <?php wp_nonce_field('sota_magic_settings'); ?>
@@ -134,6 +153,14 @@ function sota_magic_settings_page() {
                     </select>
                     <br><small>Choose how distances and speeds are displayed</small>
                 </td></tr>
+                <tr><th>Default Map Layer</th><td>
+                    <select name="sota_default_map_layer">
+                        <option value="topo" <?php selected('topo', get_option('sota_default_map_layer')); ?>>Topographic (OpenTopoMap)</option>
+                        <option value="osm" <?php selected('osm', get_option('sota_default_map_layer')); ?>>OpenStreetMap</option>
+                        <option value="carto" <?php selected('carto', get_option('sota_default_map_layer')); ?>>Minimal (CartoDB)</option>
+                    </select>
+                    <br><small>Which base map layer loads by default on the GPX track map</small>
+                </td></tr>
                 <tr><th>Activation Zone Radius</th><td><input type="number" name="sota_activation_zone_radius" value="<?php echo esc_attr(get_option('sota_activation_zone_radius')); ?>" step="10" min="20" max="200" style="width:80px;" /> meters<br><small>Used as fallback if Activation.Zone API is disabled or unavailable (default: 50m)</small></td></tr>
                 <tr><th>Rest Break Threshold</th><td><input type="number" name="sota_rest_threshold_minutes" value="<?php echo esc_attr(get_option('sota_rest_threshold_minutes')); ?>" step="1" min="1" max="30" style="width:80px;" /> minutes<br><small>Minimum duration to count as a rest break. Short stops (photos, water) won't count as breaks. (default: 3 min)</small></td></tr>
                 <tr><th>Stationary Speed Threshold</th><td><input type="number" name="sota_stationary_threshold" value="<?php echo esc_attr(get_option('sota_stationary_threshold')); ?>" step="0.1" min="0.1" max="2.0" style="width:80px;" /> km/h<br><small>Speed below this is considered stationary (default: 0.3 km/h)</small></td></tr>
@@ -159,7 +186,7 @@ function sota_magic_settings_page() {
  * Query activation.zone API for summit activation zone polygon
  * Returns array of lat/lon coordinates defining the polygon, or null on failure
  */
-function get_activation_zone_from_api($summit_ref, $summit_lat, $summit_lon, $summit_alt) {
+function sota_magic_get_activation_zone_from_api($summit_ref, $summit_lat, $summit_lon, $summit_alt) {
     // Format summit reference - try keeping slashes, only remove dash
     $summit_ref_clean = str_replace('-', '', $summit_ref);
     
@@ -334,7 +361,7 @@ function get_activation_zone_from_api($summit_ref, $summit_lat, $summit_lon, $su
  * @param array $polygon Array of [lat, lon] pairs defining polygon vertices
  * @return bool True if point is inside polygon
  */
-function point_in_polygon($lat, $lon, $polygon) {
+function sota_magic_point_in_polygon($lat, $lon, $polygon) {
     if (!is_array($polygon) || count($polygon) < 3) {
         return false;
     }
@@ -376,7 +403,7 @@ function point_in_polygon($lat, $lon, $polygon) {
  * Analyze GPX track to determine hiking vs stationary time
  * Uses hybrid approach: activation.zone API (if enabled) or radius fallback
  */
-function analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
+function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
     $stationary_threshold = floatval(get_option('sota_stationary_threshold', 0.3)); // km/h
     $activation_zone_radius = floatval(get_option('sota_activation_zone_radius', 50)); // meters
     $rest_threshold_minutes = floatval(get_option('sota_rest_threshold_minutes', 10)); // minutes
@@ -436,15 +463,16 @@ function analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
     // --- Step 1: Extract summit reference from CSV (always, regardless of zone method) ---
     $summit_ref = null;
     if ($csv_url) {
-        if (($handle = @fopen($csv_url, "r")) !== FALSE) {
-            while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                if ($data[0] == 'V2' && !empty($data[2])) {
-                    $summit_ref = $data[2];
-                    error_log('SOTA Magic: Found summit reference: ' . $summit_ref);
+        $csv_response = wp_remote_get($csv_url, ['timeout' => 15]);
+        if (!is_wp_error($csv_response)) {
+            $csv_body = wp_remote_retrieve_body($csv_response);
+            foreach (explode("\n", $csv_body) as $csv_line) {
+                $row = str_getcsv(trim($csv_line));
+                if (!empty($row[0]) && $row[0] === 'V2' && !empty($row[2])) {
+                    $summit_ref = $row[2];
                     break;
                 }
             }
-            fclose($handle);
         }
     }
 
@@ -452,8 +480,7 @@ function analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
     // This ensures the activation zone center is the official summit, not the GPX high point,
     // regardless of whether the activation.zone polygon API or radius fallback is used.
     if ($summit_ref) {
-        error_log('SOTA Magic: Fetching official summit coordinates from SOTA API...');
-        $sota_api_url = 'https://api2.sota.org.uk/api/summits/' . urlencode($summit_ref);
+        $sota_api_url = 'https://api2.sota.org.uk/api/summits/' . rawurlencode($summit_ref);
         $sota_response = @file_get_contents($sota_api_url);
         if ($sota_response) {
             $sota_data = json_decode($sota_response, true);
@@ -464,12 +491,7 @@ function analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
                 if (isset($sota_data['altM']) && floatval($sota_data['altM']) > 0) {
                     $max_elevation = floatval($sota_data['altM']);
                 }
-                error_log("SOTA Magic: Using official summit: {$summit_lat}, {$summit_lon}, {$max_elevation}m");
-            } else {
-                error_log('SOTA Magic: SOTA API response missing coordinates, keeping GPX high point');
             }
-        } else {
-            error_log('SOTA Magic: SOTA API request failed, keeping GPX high point');
         }
     }
 
@@ -478,25 +500,15 @@ function analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
     $using_api = false;
     $api_debug_message = 'Not attempted';
 
-    error_log('SOTA Magic: use_azapi setting = ' . $use_azapi);
-
     if ($use_azapi && $summit_ref && !$force_radius) {
-        error_log('SOTA Magic: Calling activation.zone API...');
-        $api_result = get_activation_zone_from_api($summit_ref, $summit_lat, $summit_lon, $max_elevation);
+        $api_result = sota_magic_get_activation_zone_from_api($summit_ref, $summit_lat, $summit_lon, $max_elevation);
         if (is_array($api_result)) {
             $activation_zone_polygon = $api_result['polygon'];
             $api_debug_message = $api_result['debug'];
             if ($activation_zone_polygon) {
                 $using_api = true;
-                error_log('SOTA Magic: API returned polygon with ' . count($activation_zone_polygon) . ' points');
-            } else {
-                error_log('SOTA Magic: activation.zone API call failed or returned null');
             }
         }
-    } else {
-        if (!$use_azapi)    error_log('SOTA Magic: activation.zone API disabled in settings');
-        if (!$summit_ref)   error_log('SOTA Magic: No summit reference, radius fallback will use official coords if SOTA API succeeded');
-        if ($force_radius)  error_log('SOTA Magic: Force-radius override active');
     }
     
     // Second pass: analyze segments and classify time
@@ -525,7 +537,7 @@ function analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
         $curr_point = $points[$i];
         
         // Calculate distance and time
-        $distance = haversine_distance($prev_point['lat'], $prev_point['lon'], $curr_point['lat'], $curr_point['lon']);
+        $distance = sota_magic_haversine_distance($prev_point['lat'], $prev_point['lon'], $curr_point['lat'], $curr_point['lon']);
         $time_diff = $curr_point['time'] - $prev_point['time'];
         
         if ($time_diff <= 0) continue;
@@ -553,31 +565,17 @@ function analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
                 ? $activation_zone_polygon[0]  // Unwrap if double-nested
                 : $activation_zone_polygon;     // Use as-is if single level
             
-            // Debug: Log first check on first iteration
-            if ($i == 1) {
-                error_log("SOTA Magic: First polygon check - Point: {$curr_point['lat']}, {$curr_point['lon']}");
-                error_log("SOTA Magic: Polygon has " . count($polygon_coords) . " vertices");
-                error_log("SOTA Magic: First vertex: " . json_encode($polygon_coords[0]));
-                error_log("SOTA Magic: Polygon structure: " . (is_array($polygon_coords[0][0]) ? 'double-nested' : 'single-level'));
-            }
-            
-            $in_activation_zone = point_in_polygon($curr_point['lat'], $curr_point['lon'], $polygon_coords);
-            
-            // Debug: count
+            $in_activation_zone = sota_magic_point_in_polygon($curr_point['lat'], $curr_point['lon'], $polygon_coords);
+
             if ($in_activation_zone) {
                 $points_in_zone++;
                 if ($is_stationary) $stationary_in_zone++;
                 if ($speed > $max_speed_in_zone) $max_speed_in_zone = $speed;
                 if ($speed < $min_speed_in_zone) $min_speed_in_zone = $speed;
             }
-            
-            // Debug: Log first few results
-            if ($i <= 5) {
-                error_log("SOTA Magic: Point $i - Speed: " . round($speed, 2) . " km/h, In zone: " . ($in_activation_zone ? 'YES' : 'NO') . ", Stationary: " . ($is_stationary ? 'YES' : 'NO'));
-            }
         } else {
             // Use fallback radius method
-            $dist_from_summit = haversine_distance($summit_lat, $summit_lon, $curr_point['lat'], $curr_point['lon']);
+            $dist_from_summit = sota_magic_haversine_distance($summit_lat, $summit_lon, $curr_point['lat'], $curr_point['lon']);
             $in_activation_zone = ($dist_from_summit <= $activation_zone_radius);
         }
         
@@ -722,7 +720,7 @@ function sota_get_gpx_track_points($gpx_url, $max_points = 800) {
  * Calculate distance between two lat/lon points using Haversine formula
  * Returns distance in meters
  */
-function haversine_distance($lat1, $lon1, $lat2, $lon2) {
+function sota_magic_haversine_distance($lat1, $lon1, $lat2, $lon2) {
     $earth_radius = 6371000; // meters
     
     $lat1_rad = deg2rad($lat1);
@@ -742,7 +740,7 @@ function haversine_distance($lat1, $lon1, $lat2, $lon2) {
 /**
  * Format seconds into human-readable time
  */
-function format_time_duration($seconds) {
+function sota_magic_format_time_duration($seconds) {
     $hours = floor($seconds / 3600);
     $minutes = floor(($seconds % 3600) / 60);
     
@@ -756,23 +754,23 @@ function format_time_duration($seconds) {
 /**
  * Convert kilometers to miles
  */
-function km_to_miles($km) {
+function sota_magic_km_to_miles($km) {
     return $km * 0.621371;
 }
 
 /**
  * Convert meters to feet
  */
-function meters_to_feet($meters) {
+function sota_magic_meters_to_feet($meters) {
     return $meters * 3.28084;
 }
 
 /**
  * Format distance based on unit preference
  */
-function format_distance($km, $unit_system = 'metric') {
+function sota_magic_format_distance($km, $unit_system = 'metric') {
     if ($unit_system === 'imperial') {
-        $miles = km_to_miles($km);
+        $miles = sota_magic_km_to_miles($km);
         return number_format($miles, 2) . ' mi';
     }
     return number_format($km, 2) . ' km';
@@ -781,9 +779,9 @@ function format_distance($km, $unit_system = 'metric') {
 /**
  * Format elevation based on unit preference
  */
-function format_elevation($meters, $unit_system = 'metric') {
+function sota_magic_format_elevation($meters, $unit_system = 'metric') {
     if ($unit_system === 'imperial') {
-        $feet = meters_to_feet($meters);
+        $feet = sota_magic_meters_to_feet($meters);
         return number_format($feet, 0) . ' ft';
     }
     return number_format($meters, 0) . ' m';
@@ -792,9 +790,9 @@ function format_elevation($meters, $unit_system = 'metric') {
 /**
  * Format speed based on unit preference
  */
-function format_speed($kmh, $unit_system = 'metric') {
+function sota_magic_format_speed($kmh, $unit_system = 'metric') {
     if ($unit_system === 'imperial') {
-        $mph = km_to_miles($kmh);
+        $mph = sota_magic_km_to_miles($kmh);
         return number_format($mph, 1) . ' mph';
     }
     return number_format($kmh, 1) . ' km/h';
@@ -803,21 +801,21 @@ function format_speed($kmh, $unit_system = 'metric') {
 /**
  * Get distance unit label
  */
-function get_distance_unit($unit_system = 'metric') {
+function sota_magic_get_distance_unit($unit_system = 'metric') {
     return $unit_system === 'imperial' ? 'mi' : 'km';
 }
 
 /**
  * Get elevation unit label
  */
-function get_elevation_unit($unit_system = 'metric') {
+function sota_magic_get_elevation_unit($unit_system = 'metric') {
     return $unit_system === 'imperial' ? 'ft' : 'm';
 }
 
 /**
  * Get speed unit label
  */
-function get_speed_unit($unit_system = 'metric') {
+function sota_magic_get_speed_unit($unit_system = 'metric') {
     return $unit_system === 'imperial' ? 'mph' : 'km/h';
 }
 
@@ -825,12 +823,12 @@ function get_speed_unit($unit_system = 'metric') {
 add_action('init', function() {
     register_block_type('ki6cr/sota-data', [
         'editor_script' => 'sota-editor-js',
-        'render_callback' => 'ki6cr_render_sota_data'
+        'render_callback' => 'sota_magic_render_sota_data'
     ]);
 });
 
 add_action('enqueue_block_editor_assets', function() {
-    wp_register_script('sota-editor-js', '', ['wp-blocks','wp-element','wp-editor','wp-components']);
+    wp_register_script('sota-editor-js', '', ['wp-blocks','wp-element','wp-editor','wp-components'], '1.0.0', true);
     wp_add_inline_script('sota-editor-js', "
         wp.blocks.registerBlockType('ki6cr/sota-data', {
             title: 'SOTAMAGIC',
@@ -852,39 +850,99 @@ add_action('enqueue_block_editor_assets', function() {
                 overrideTotalTime: {type:'string', default:''}
             },
             edit: function(props) {
+                var _ms = wp.element.useState(false);
+                var showModal = _ms[0];
+                var setShowModal = _ms[1];
                 return wp.element.createElement('div', {
                     style:{padding:'25px', background:'\\x23f5f5f5', border:'2px dashed \\x230073aa', borderRadius:'8px', textAlign:'center'}
                 },
                     wp.element.createElement('h3', {style:{margin:'0 0 10px 0', color:'\\x230073aa'}}, '🏔️ SOTAMAGIC'),
                     wp.element.createElement('p', {style:{color:'\\x23d32f2f', fontWeight:'bold', margin:'0 0 10px 0'}}, '⚠️ Map and table visible in Preview only'),
-                    wp.element.createElement('p', {style:{color:'\\x23666', fontSize:'13px', marginBottom:'20px'}}, 'Settings → SOTA Magic to customize'),
-                    wp.element.createElement('div', {style:{display:'flex', gap:'10px', justifyContent:'center', marginBottom:'15px'}},
-                        wp.element.createElement(wp.editor.MediaUpload, {
-                            onSelect: function(media) { props.setAttributes({gpxUrl: media.url}); },
-                            allowedTypes: ['application/gpx+xml', 'text/xml'],
-                            render: function(obj) {
-                                return wp.element.createElement(wp.components.Button, {
-                                    isPrimary: true,
-                                    onClick: obj.open
-                                }, props.attributes.gpxUrl ? '✓ GPX Selected' : 'Upload GPX');
-                            }
-                        }),
-                        wp.element.createElement(wp.editor.MediaUpload, {
-                            onSelect: function(media) { props.setAttributes({csvUrl: media.url}); },
-                            allowedTypes: ['text/csv'],
-                            render: function(obj) {
-                                return wp.element.createElement(wp.components.Button, {
-                                    isPrimary: true,
-                                    onClick: obj.open
-                                }, props.attributes.csvUrl ? '✓ CSV Selected' : 'Upload CSV');
-                            }
-                        })
+                    wp.element.createElement('p', {style:{color:'\\x23666', fontSize:'13px', marginBottom:'16px'}}, 'Settings → SOTA Magic to customize colors, units, and more.'),
+                    wp.element.createElement('div', {style:{textAlign:'left', marginBottom:'16px'}},
+                        wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px'}},
+                            wp.element.createElement('div', {style:{flex:'1', minWidth:'0'}},
+                                wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, '📍 GPS Track (.gpx)'),
+                                wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, 'The track file exported from your GPS device or app — Garmin, Gaia GPS, CalTopo, etc.')
+                            ),
+                            wp.element.createElement(wp.editor.MediaUpload, {
+                                onSelect: function(media) { props.setAttributes({gpxUrl: media.url}); },
+                                allowedTypes: ['application/gpx+xml', 'text/xml'],
+                                render: function(obj) {
+                                    return wp.element.createElement(wp.components.Button, {
+                                        isPrimary: !!props.attributes.gpxUrl,
+                                        isSecondary: !props.attributes.gpxUrl,
+                                        onClick: obj.open,
+                                        style:{flexShrink:'0', whiteSpace:'nowrap'}
+                                    }, props.attributes.gpxUrl ? '✓ GPX Uploaded' : 'Upload GPX');
+                                }
+                            })
+                        ),
+                        wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', display:'flex', alignItems:'center', gap:'12px'}},
+                            wp.element.createElement('div', {style:{flex:'1', minWidth:'0'}},
+                                wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, '📋 Contacts Log (.csv)'),
+                                wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, 'The same CSV file you upload to the official SOTA website (sotadata.org.uk) — SOTA CSV v2 format.')
+                            ),
+                            wp.element.createElement(wp.editor.MediaUpload, {
+                                onSelect: function(media) { props.setAttributes({csvUrl: media.url}); },
+                                allowedTypes: ['text/csv'],
+                                render: function(obj) {
+                                    return wp.element.createElement(wp.components.Button, {
+                                        isPrimary: !!props.attributes.csvUrl,
+                                        isSecondary: !props.attributes.csvUrl,
+                                        onClick: obj.open,
+                                        style:{flexShrink:'0', whiteSpace:'nowrap'}
+                                    }, props.attributes.csvUrl ? '✓ CSV Uploaded' : 'Upload CSV');
+                                }
+                            })
+                        )
                     ),
-                    wp.element.createElement('div', {style:{fontSize:'14px', color:'\\x23666', marginBottom:'20px'}},
-                        wp.element.createElement('div', null, 'GPX: ' + (props.attributes.gpxUrl ? '✅' : '❌')),
-                        wp.element.createElement('div', null, 'CSV: ' + (props.attributes.csvUrl ? '✅' : '❌'))
+                    wp.element.createElement('div', {style:{textAlign:'center', marginBottom:'10px'}},
+                        wp.element.createElement('button', {
+                            onClick: function(e) { e.preventDefault(); setShowModal(true); },
+                            style:{background:'none', border:'1px solid \\x230073aa', borderRadius:'20px', color:'\\x230073aa', fontSize:'12px', cursor:'pointer', padding:'3px 14px', lineHeight:'1.6'}
+                        }, 'ℹ️ How are statistics calculated?')
                     ),
-                    wp.element.createElement(wp.components.PanelBody, {title:'⚙️ Manual Overrides', initialOpen:false},
+                    showModal && wp.element.createElement(wp.components.Modal, {
+                        title: '📊 How Statistics Are Calculated',
+                        onRequestClose: function() { setShowModal(false); }
+                    },
+                        wp.element.createElement('div', {style:{fontSize:'13px', lineHeight:'1.65', color:'\\x23333333', maxWidth:'500px'}},
+
+                            wp.element.createElement('h3', {style:{marginTop:'0', marginBottom:'6px', color:'\\x230073aa', fontSize:'14px'}}, '📍 Activation Zone'),
+                            wp.element.createElement('p', {style:{marginTop:'0'}}, 'The activation zone boundary is the foundation — all time stats depend on it. Here is how it is determined, in order:'),
+                            wp.element.createElement('ol', {style:{paddingLeft:'18px', margin:'6px 0 0 0'}},
+                                wp.element.createElement('li', {style:{marginBottom:'5px'}}, wp.element.createElement('strong', null, 'Summit reference'), ' is read from your CSV file (e.g. W6/CT-001).'),
+                                wp.element.createElement('li', {style:{marginBottom:'5px'}}, wp.element.createElement('strong', null, 'Official coordinates'), ' are fetched from the SOTA API (api2.sota.org.uk).'),
+                                wp.element.createElement('li', {style:{marginBottom:'5px'}}, wp.element.createElement('strong', null, 'Activation.Zone API'), ' (by N6ARA) returns a precise terrain-based polygon using the official 25m vertical drop rule.'),
+                                wp.element.createElement('li', null, wp.element.createElement('strong', null, 'Fallback:'), ' if no summit reference or the API is unavailable, a radius circle is drawn around the highest GPS point in your track.')
+                            ),
+
+                            wp.element.createElement('hr', {style:{border:'none', borderTop:'1px solid \\x23eeeeee', margin:'14px 0'}}),
+
+                            wp.element.createElement('h3', {style:{margin:'0 0 8px 0', color:'\\x230073aa', fontSize:'14px'}}, '⏱️ Time Statistics'),
+                            wp.element.createElement('p', {style:{margin:'0 0 6px 0'}}, wp.element.createElement('strong', null, 'Activation Time: '), 'All time spent inside the activation zone — whether you are moving around the summit, setting up, or operating.'),
+                            wp.element.createElement('p', {style:{margin:'0 0 6px 0'}}, wp.element.createElement('strong', null, 'Hiking Time: '), 'All time spent outside the zone. Rest breaks are included and shown as a sub-note under hiking time.'),
+                            wp.element.createElement('p', {style:{margin:'0'}}, wp.element.createElement('strong', null, 'Total Time: '), 'Elapsed time from the first to the last GPS trackpoint.'),
+
+                            wp.element.createElement('hr', {style:{border:'none', borderTop:'1px solid \\x23eeeeee', margin:'14px 0'}}),
+
+                            wp.element.createElement('h3', {style:{margin:'0 0 8px 0', color:'\\x230073aa', fontSize:'14px'}}, '🔧 Why Stats Might Look Wrong'),
+                            wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
+                                wp.element.createElement('strong', null, 'Activation time is 0 or missing'), ' — The plugin could not locate the activation zone. Check that your CSV file includes a valid summit reference. Turn on Debug Mode in Settings → SOTA Magic for details.'
+                            ),
+                            wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
+                                wp.element.createElement('strong', null, 'Zone looks wrong on the map'), ' — Look for a red polygon (API-based) or orange circle (radius fallback) on the map. If you see a circle, the API did not return a zone. Try increasing the radius in Settings, or use the Statistics Override below to force a specific value.'
+                            ),
+                            wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
+                                wp.element.createElement('strong', null, 'Hiking time seems too high'), ' — Rest breaks are included in hiking time. Adjust the rest break threshold in Settings → SOTA Magic.'
+                            ),
+                            wp.element.createElement('p', {style:{margin:'0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
+                                wp.element.createElement('strong', null, 'GPS track does not reach the summit'), ' — The zone is centred on the highest point in your track. If you stopped before the peak, use the Activation Zone radius override below or manually enter the activation time.'
+                            )
+                        )
+                    ),
+                    wp.element.createElement(wp.components.PanelBody, {title:'⚙️ Statistics Overrides', initialOpen:false},
                         wp.element.createElement('p', {style:{fontSize:'12px', color:'\\x23555555', marginTop:'0', marginBottom:'12px', lineHeight:'1.5'}},
                             'Check the box next to a field to enable that override. Leave unchecked to use the GPX-calculated value.'
                         ),
@@ -1047,7 +1105,7 @@ function sota_parse_time_override($hhmm) {
     return null;
 }
 
-function ki6cr_render_sota_data($atts) {
+function sota_magic_render_sota_data($atts) {
     $gpx_url = $atts['gpxUrl'] ?? '';
     $csv_url = $atts['csvUrl'] ?? '';
     if (!$gpx_url && !$csv_url) return '';
@@ -1060,11 +1118,11 @@ function ki6cr_render_sota_data($atts) {
     $override_rest_breaks   = !empty($atts['overrideRestBreaksEnabled'])     ? trim($atts['overrideRestBreaks'] ?? '')    : '';
     $override_total_time    = !empty($atts['overrideTotalTimeEnabled'])      ? trim($atts['overrideTotalTime'] ?? '')     : '';
 
-    $bg = get_option('sota_is_transparent') ? 'transparent' : get_option('sota_bg_color');
-    $text = get_option('sota_text_color');
-    $font = get_option('sota_use_theme_font') ? 'inherit' : 'sans-serif';
-    $s2s_bg = get_option('sota_s2s_highlight');
-    $s2s_text = get_option('sota_s2s_text_color');
+    $bg       = esc_attr(get_option('sota_is_transparent') ? 'transparent' : get_option('sota_bg_color'));
+    $text     = esc_attr(get_option('sota_text_color'));
+    $font     = esc_attr(get_option('sota_use_theme_font') ? 'inherit' : 'sans-serif');
+    $s2s_bg   = esc_attr(get_option('sota_s2s_highlight'));
+    $s2s_text = esc_attr(get_option('sota_s2s_text_color'));
     $show_map = get_option('sota_show_contact_map');
     $show_gpx_stats = get_option('sota_show_gpx_stats');
     $unit_system = get_option('sota_unit_system', 'metric');
@@ -1073,7 +1131,7 @@ function ki6cr_render_sota_data($atts) {
     $gpx_stats = null;
     $track_points = [];
     if ($gpx_url && $show_gpx_stats) {
-        $gpx_stats = analyze_gpx_track($gpx_url, $csv_url, $force_radius_zone);
+        $gpx_stats = sota_magic_analyze_gpx_track($gpx_url, $csv_url, $force_radius_zone);
         if ($gpx_stats && !empty($gpx_stats['track_points'])) {
             $track_points = $gpx_stats['track_points'];
         }
@@ -1118,7 +1176,7 @@ function ki6cr_render_sota_data($atts) {
     // Build map iframe URL if needed
     $map_iframe_url = '';
     if ($show_map && $csv_url) {
-        $map_iframe_url = plugins_url('contact-map.php', __FILE__) . '?csv=' . urlencode($csv_url) . '&v=1.3';
+        $map_iframe_url = plugins_url('contact-map.php', __FILE__) . '?csv=' . urlencode($csv_url) . '&_nonce=' . wp_create_nonce('sota_magic_contact_map');
     }
 
     // Unique map ID for this block (static counter survives multiple blocks on one page)
@@ -1166,6 +1224,7 @@ function ki6cr_render_sota_data($atts) {
             'activationZone' => $az_data,
             'units'          => $unit_system,
             'popupText'      => 'Summit / Activation Zone',
+            'defaultLayer'   => get_option('sota_default_map_layer', 'topo'),
         ];
 
         wp_add_inline_script('sota-magic-map',
@@ -1177,9 +1236,9 @@ function ki6cr_render_sota_data($atts) {
     ?>
     <style>
         .sota-main-container {
-            background: <?php echo $bg; ?>;
-            color: <?php echo $text; ?>;
-            font-family: <?php echo $font; ?>;
+            background: <?php echo esc_attr($bg); ?>;
+            color: <?php echo esc_attr($text); ?>;
+            font-family: <?php echo esc_attr($font); ?>;
             padding: 30px;
             border-radius: 12px;
             margin: 40px 0;
@@ -1188,11 +1247,11 @@ function ki6cr_render_sota_data($atts) {
             <?php endif; ?>
         }
         .sota-main-container h3 {
-            color: <?php echo $text; ?>;
-            border-bottom: 1px solid <?php echo $text; ?>44;
+            color: <?php echo esc_attr($text); ?>;
+            border-bottom: 1px solid <?php echo esc_attr($text); ?>44;
             padding-bottom: 10px;
         }
-        
+
         /* GPX Statistics Grid */
         .sota-gpx-stats {
             display: grid;
@@ -1200,11 +1259,11 @@ function ki6cr_render_sota_data($atts) {
             gap: 20px;
             margin: 0 0 20px 0;
             padding: 20px;
-            background: <?php echo $bg === 'transparent' ? 'rgba(255,255,255,0.05)' : ($bg . '22'); ?>;
+            background: <?php echo $bg === 'transparent' ? 'rgba(255,255,255,0.05)' : (esc_attr($bg) . '22'); ?>;
             border-radius: 8px;
-            border: 1px solid <?php echo $text; ?>22;
+            border: 1px solid <?php echo esc_attr($text); ?>22;
         }
-        
+
         .sota-stat-box {
             text-align: center;
             padding: 15px;
@@ -1214,32 +1273,32 @@ function ki6cr_render_sota_data($atts) {
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             <?php endif; ?>
         }
-        
+
         .sota-stat-icon {
             font-size: 28px;
             margin-bottom: 8px;
         }
-        
+
         .sota-stat-value {
             font-size: 24px;
             font-weight: bold;
-            color: <?php echo $text; ?>;
+            color: <?php echo esc_attr($text); ?>;
             margin-bottom: 5px;
         }
-        
+
         .sota-stat-label {
             font-size: 13px;
-            color: <?php echo $text; ?>99;
+            color: <?php echo esc_attr($text); ?>99;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        
+
         .sota-stat-secondary {
             font-size: 12px;
-            color: <?php echo $text; ?>77;
+            color: <?php echo esc_attr($text); ?>77;
             margin-top: 5px;
         }
-        
+
         /* Responsive table wrapper */
         .sota-table-wrapper {
             overflow-x: auto;
@@ -1250,18 +1309,18 @@ function ki6cr_render_sota_data($atts) {
         .sota-table {
             width: 100%;
             border-collapse: collapse;
-            color: <?php echo $text; ?>;
+            color: <?php echo esc_attr($text); ?>;
             min-width: 800px; /* Ensures table doesn't get too cramped */
         }
         .sota-table th {
-            border-bottom: 2px solid <?php echo $text; ?>66;
+            border-bottom: 2px solid <?php echo esc_attr($text); ?>66;
             padding: 12px;
             text-align: left;
             white-space: nowrap;
         }
         .sota-table td {
             padding: 10px;
-            border-bottom: 1px solid <?php echo $text; ?>22;
+            border-bottom: 1px solid <?php echo esc_attr($text); ?>22;
             vertical-align: top;
         }
         /* Allow comments column to wrap text */
@@ -1271,12 +1330,12 @@ function ki6cr_render_sota_data($atts) {
             max-width: 300px;
         }
         .s2s-row td {
-            background: <?php echo $s2s_bg; ?> !important;
-            color: <?php echo $s2s_text; ?> !important;
+            background: <?php echo esc_attr($s2s_bg); ?> !important;
+            color: <?php echo esc_attr($s2s_text); ?> !important;
             font-weight: bold;
         }
         .s2s-badge {
-            background: <?php echo $s2s_text; ?>;
+            background: <?php echo esc_attr($s2s_text); ?>;
             color: white;
             padding: 2px 6px;
             border-radius: 3px;
@@ -1463,66 +1522,66 @@ function ki6cr_render_sota_data($atts) {
                 <div class="sota-gpx-stats">
                     <div class="sota-stat-box">
                         <div class="sota-stat-icon">🥾</div>
-                        <div class="sota-stat-value"><?php echo format_time_duration($gpx_stats['hiking_time']); ?></div>
+                        <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_time_duration($gpx_stats['hiking_time'])); ?></div>
                         <div class="sota-stat-label">Hiking Time</div>
                         <div class="sota-stat-secondary">
-                            <?php echo format_distance($gpx_stats['hiking_distance'], $unit_system); ?>
+                            <?php echo esc_html(sota_magic_format_distance($gpx_stats['hiking_distance'], $unit_system)); ?>
                             <?php if ($gpx_stats['rest_break_time'] > 0): ?>
-                                <br><em style="font-size:11px;opacity:0.8;">(<?php echo format_time_duration($gpx_stats['rest_break_time']); ?> breaks)</em>
+                                <br><em style="font-size:11px;opacity:0.8;">(<?php echo esc_html(sota_magic_format_time_duration($gpx_stats['rest_break_time'])); ?> breaks)</em>
                             <?php endif; ?>
                         </div>
                     </div>
-                    
+
                     <div class="sota-stat-box">
                         <div class="sota-stat-icon">📻</div>
-                        <div class="sota-stat-value"><?php echo format_time_duration($gpx_stats['stationary_time']); ?></div>
+                        <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_time_duration($gpx_stats['stationary_time'])); ?></div>
                         <div class="sota-stat-label">Activation Time</div>
                         <div class="sota-stat-secondary">
                             <?php if ($gpx_stats['using_api']): ?>
                                 <span title="Using precise activation zone from activation.zone API">✓ API-based zone</span>
                             <?php else: ?>
-                                <span title="Using radius approximation method">Within <?php echo $gpx_stats['activation_zone_radius']; ?>m of summit</span>
+                                <span title="Using radius approximation method">Within <?php echo esc_html((string) $gpx_stats['activation_zone_radius']); ?>m of summit</span>
                             <?php endif; ?>
                         </div>
                     </div>
-                    
+
                     <div class="sota-stat-box">
                         <div class="sota-stat-icon">⏱️</div>
-                        <div class="sota-stat-value"><?php echo format_time_duration($gpx_stats['total_time']); ?></div>
+                        <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_time_duration($gpx_stats['total_time'])); ?></div>
                         <div class="sota-stat-label">Total Time</div>
-                        <div class="sota-stat-secondary"><?php echo format_distance($gpx_stats['total_distance'], $unit_system); ?></div>
+                        <div class="sota-stat-secondary"><?php echo esc_html(sota_magic_format_distance($gpx_stats['total_distance'], $unit_system)); ?></div>
                     </div>
-                    
+
                     <div class="sota-stat-box">
                         <div class="sota-stat-icon">📈</div>
-                        <div class="sota-stat-value"><?php echo format_elevation($gpx_stats['elevation_gain'], $unit_system); ?></div>
+                        <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_elevation($gpx_stats['elevation_gain'], $unit_system)); ?></div>
                         <div class="sota-stat-label">Elevation Gain</div>
-                        <div class="sota-stat-secondary">↓ <?php echo format_elevation($gpx_stats['elevation_loss'], $unit_system); ?> loss</div>
+                        <div class="sota-stat-secondary">↓ <?php echo esc_html(sota_magic_format_elevation($gpx_stats['elevation_loss'], $unit_system)); ?> loss</div>
                     </div>
-                    
+
                     <div class="sota-stat-box">
                         <div class="sota-stat-icon">🚶</div>
-                        <div class="sota-stat-value"><?php echo format_speed($gpx_stats['hiking_speed'], $unit_system); ?></div>
+                        <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_speed($gpx_stats['hiking_speed'], $unit_system)); ?></div>
                         <div class="sota-stat-label">Hiking Speed</div>
                         <div class="sota-stat-secondary">average</div>
                     </div>
-                    
+
                     <div class="sota-stat-box">
                         <div class="sota-stat-icon">⛰️</div>
-                        <div class="sota-stat-value"><?php echo format_elevation($gpx_stats['max_elevation'], $unit_system); ?></div>
+                        <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_elevation($gpx_stats['max_elevation'], $unit_system)); ?></div>
                         <div class="sota-stat-label">Peak Elevation</div>
-                        <div class="sota-stat-secondary"><?php echo format_elevation($gpx_stats['min_elevation'], $unit_system); ?> base</div>
+                        <div class="sota-stat-secondary"><?php echo esc_html(sota_magic_format_elevation($gpx_stats['min_elevation'], $unit_system)); ?> base</div>
                     </div>
                 </div>
-                
+
                 <!-- Methodology explanation -->
                 <div style="margin-top:15px; padding:12px; background:rgba(0,0,0,0.03); border-radius:8px; font-size:13px; color:#666;">
                     <strong>Activation Zone Method:</strong>
                     <?php if ($gpx_stats['using_api']): ?>
-                        Using precise terrain-based activation zone from <a href="https://activation.zone" target="_blank" style="color:#0073aa;">activation.zone</a> (by N6ARA). 
+                        Using precise terrain-based activation zone from <a href="https://activation.zone" target="_blank" style="color:#0073aa;">activation.zone</a> (by N6ARA).
                         This uses Digital Elevation Model (DEM) data and the official SOTA 25m vertical drop rule for maximum accuracy.
                     <?php else: ?>
-                        Using radius approximation method (<?php echo $gpx_stats['activation_zone_radius']; ?>m from highest GPS point). 
+                        Using radius approximation method (<?php echo esc_html((string) $gpx_stats['activation_zone_radius']); ?>m from highest GPS point).
                         For more accuracy, enable the activation.zone API in Settings → SOTA Magic, or ensure your CSV file includes the summit reference.
                     <?php endif; ?>
                 </div>
@@ -1575,7 +1634,7 @@ function ki6cr_render_sota_data($atts) {
                             <?php if ($gpx_stats['using_api']): ?>
                             <p><strong>API-based zone (currently active):</strong> The boundary is retrieved from <a href="https://activation.zone" target="_blank" style="color:#0073aa;">activation.zone</a> using Digital Elevation Model (DEM) terrain data and the official SOTA rule — the zone extends to where the terrain drops 25 metres below the summit. This is the most accurate method and matches what SOTA adjudicators use.</p>
                             <?php else: ?>
-                            <p><strong>Radius method (currently active):</strong> The activation zone is approximated as a circle of <strong><?php echo $gpx_stats['activation_zone_radius']; ?> metres</strong> around the highest GPS point. This is less precise than the API method because it ignores terrain shape, but works without an internet lookup or summit reference in the log.</p>
+                            <p><strong>Radius method (currently active):</strong> The activation zone is approximated as a circle of <strong><?php echo esc_html((string) $gpx_stats['activation_zone_radius']); ?> metres</strong> around the highest GPS point. This is less precise than the API method because it ignores terrain shape, but works without an internet lookup or summit reference in the log.</p>
                             <p>For better accuracy, enable the activation.zone API in <em>Settings → SOTA Magic</em> and ensure your CSV log includes the summit reference.</p>
                             <?php endif; ?>
                         </div>
@@ -1602,24 +1661,24 @@ function ki6cr_render_sota_data($atts) {
                     <strong>🔍 Debug Info (only visible to admins):</strong><br>
                     API Enabled: <?php echo get_option('sota_use_azapi') ? 'YES' : 'NO'; ?><br>
                     CSV URL: <?php echo $csv_url ? 'Present' : 'Missing'; ?><br>
-                    Summit Reference: <?php echo isset($gpx_stats['summit_ref']) ? $gpx_stats['summit_ref'] : 'Not extracted'; ?><br>
+                    Summit Reference: <?php echo esc_html(isset($gpx_stats['summit_ref']) ? $gpx_stats['summit_ref'] : 'Not extracted'); ?><br>
                     Using API: <?php echo $gpx_stats['using_api'] ? 'YES' : 'NO'; ?><br>
-                    Summit Lat/Lon: <?php echo $gpx_stats['summit_lat'] . ', ' . $gpx_stats['summit_lon']; ?><br>
-                    Max Elevation: <?php echo $gpx_stats['max_elevation']; ?> m<br>
-                    Polygon Data: <?php 
+                    Summit Lat/Lon: <?php echo esc_html($gpx_stats['summit_lat'] . ', ' . $gpx_stats['summit_lon']); ?><br>
+                    Max Elevation: <?php echo esc_html((string) $gpx_stats['max_elevation']); ?> m<br>
+                    Polygon Data: <?php
                         if ($gpx_stats['activation_zone_polygon']) {
                             $point_count = is_array($gpx_stats['activation_zone_polygon'][0]) ? count($gpx_stats['activation_zone_polygon'][0]) : count($gpx_stats['activation_zone_polygon']);
-                            echo 'Present (' . $point_count . ' points)';
+                            echo esc_html('Present (' . $point_count . ' points)');
                         } else {
                             echo 'NULL';
                         }
                     ?><br>
-                    <strong>API Debug:</strong> <?php echo isset($gpx_stats['api_debug']) ? $gpx_stats['api_debug'] : 'N/A'; ?><br>
-                    <strong>Polygon Check:</strong> <?php echo isset($gpx_stats['polygon_check_debug']) ? $gpx_stats['polygon_check_debug'] : 'N/A'; ?><br>
-                    <strong>Points in Zone:</strong> <?php echo isset($gpx_stats['points_in_zone']) ? $gpx_stats['points_in_zone'] : 0; ?> total, <?php echo isset($gpx_stats['stationary_in_zone']) ? $gpx_stats['stationary_in_zone'] : 0; ?> stationary<br>
-                    <strong>Speed Range in Zone:</strong> <?php echo isset($gpx_stats['speed_range_in_zone']) ? $gpx_stats['speed_range_in_zone'] : 'N/A'; ?><br>
-                    <strong>Stationary Threshold:</strong> <?php echo get_option('sota_stationary_threshold'); ?> km/h<br>
-                    <strong>Activation Time:</strong> <?php echo format_time_duration($gpx_stats['stationary_time']); ?> (<?php echo $gpx_stats['stationary_time']; ?> seconds)
+                    <strong>API Debug:</strong> <?php echo esc_html(isset($gpx_stats['api_debug']) ? $gpx_stats['api_debug'] : 'N/A'); ?><br>
+                    <strong>Polygon Check:</strong> <?php echo esc_html(isset($gpx_stats['polygon_check_debug']) ? $gpx_stats['polygon_check_debug'] : 'N/A'); ?><br>
+                    <strong>Points in Zone:</strong> <?php echo esc_html((string)(isset($gpx_stats['points_in_zone']) ? $gpx_stats['points_in_zone'] : 0)); ?> total, <?php echo esc_html((string)(isset($gpx_stats['stationary_in_zone']) ? $gpx_stats['stationary_in_zone'] : 0)); ?> stationary<br>
+                    <strong>Speed Range in Zone:</strong> <?php echo esc_html(isset($gpx_stats['speed_range_in_zone']) ? $gpx_stats['speed_range_in_zone'] : 'N/A'); ?><br>
+                    <strong>Stationary Threshold:</strong> <?php echo esc_html(get_option('sota_stationary_threshold')); ?> km/h<br>
+                    <strong>Activation Time:</strong> <?php echo esc_html(sota_magic_format_time_duration($gpx_stats['stationary_time'])); ?> (<?php echo esc_html((string) $gpx_stats['stationary_time']); ?> seconds)
                 </div>
                 <?php endif; ?>
             <?php endif; ?>
@@ -1651,38 +1710,39 @@ function ki6cr_render_sota_data($atts) {
                     </thead>
                     <tbody>
                     <?php
-                    if (($handle = @fopen($csv_url, "r")) !== FALSE) {
-                        while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                            if ($data[0] == 'V2') {
-                                $s2s = !empty(trim($data[8] ?? ''));
-                                
-                                // Format date according to WordPress settings
-                                $csv_date = $data[3]; // Format: DD/MM/YY (e.g., 16/01/26)
-                                $parts = explode('/', $csv_date);
-                                if (count($parts) == 3) {
-                                    $day = (int)$parts[0];
-                                    $month = (int)$parts[1];
-                                    $year = (int)$parts[2];
-                                    // Handle 2-digit year (26 = 2026, not 1926)
-                                    $year = $year < 50 ? 2000 + $year : 1900 + $year;
-                                    $formatted_date = date_i18n(get_option('date_format'), strtotime("$year-$month-$day"));
-                                } else {
-                                    $formatted_date = $csv_date; // Fallback to original
-                                }
-                                
-                                echo '<tr class="'.($s2s ? 's2s-row' : '').'">';
-                                echo '<td>'.$formatted_date.'</td>';
-                                echo '<td>'.$data[4].'</td>';
-                                echo '<td><strong>'.$data[7].'</strong>'.($s2s ? '<span class="s2s-badge">S2S</span>' : '').'</td>';
-                                echo '<td>'.$data[5].'</td>';
-                                echo '<td>'.$data[6].'</td>';
-                                echo '<td>'.$data[2].'</td>';
-                                echo '<td>'.$data[8].'</td>';
-                                echo '<td>'.($data[9] ?? '').'</td>';
-                                echo '</tr>';
+                    $csv_table_response = wp_remote_get($csv_url, ['timeout' => 15]);
+                    if (!is_wp_error($csv_table_response)) {
+                        $csv_table_body = wp_remote_retrieve_body($csv_table_response);
+                        foreach (explode("\n", $csv_table_body) as $csv_table_line) {
+                            $data = str_getcsv(trim($csv_table_line));
+                            if (empty($data[0]) || $data[0] !== 'V2') continue;
+                            $s2s = !empty(trim($data[8] ?? ''));
+
+                            // Format date according to WordPress settings
+                            $csv_date = $data[3]; // Format: DD/MM/YY (e.g., 16/01/26)
+                            $parts = explode('/', $csv_date);
+                            if (count($parts) === 3) {
+                                $day   = (int) $parts[0];
+                                $month = (int) $parts[1];
+                                $year  = (int) $parts[2];
+                                // Handle 2-digit year (26 = 2026, not 1926)
+                                $year = $year < 50 ? 2000 + $year : 1900 + $year;
+                                $formatted_date = date_i18n(get_option('date_format'), strtotime("$year-$month-$day"));
+                            } else {
+                                $formatted_date = $csv_date; // Fallback to original
                             }
+
+                            echo '<tr class="' . ($s2s ? 's2s-row' : '') . '">';
+                            echo '<td>' . esc_html($formatted_date) . '</td>';
+                            echo '<td>' . esc_html($data[4] ?? '') . '</td>';
+                            echo '<td><strong>' . esc_html($data[7] ?? '') . '</strong>' . ($s2s ? '<span class="s2s-badge">S2S</span>' : '') . '</td>';
+                            echo '<td>' . esc_html($data[5] ?? '') . '</td>';
+                            echo '<td>' . esc_html($data[6] ?? '') . '</td>';
+                            echo '<td>' . esc_html($data[2] ?? '') . '</td>';
+                            echo '<td>' . esc_html($data[8] ?? '') . '</td>';
+                            echo '<td>' . esc_html($data[9] ?? '') . '</td>';
+                            echo '</tr>';
                         }
-                        fclose($handle);
                     }
                     ?>
                     </tbody>

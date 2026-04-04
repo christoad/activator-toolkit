@@ -81,7 +81,9 @@ window.sotaMagicInitMap = function (mapId, data) {
         { attribution: '&copy; OpenStreetMap contributors &copy; <a href="https://carto.com">CARTO</a>', maxZoom: 19 }
     );
 
-    topoLayer.addTo(map); // Topo is most useful for hiking routes
+    // Add default layer based on settings preference
+    var defaultLayers = { topo: topoLayer, osm: osmLayer, carto: cartoLayer };
+    (defaultLayers[data.defaultLayer] || topoLayer).addTo(map);
 
     L.control.layers(
         { 'Topographic': topoLayer, 'OpenStreetMap': osmLayer, 'Minimal': cartoLayer },
