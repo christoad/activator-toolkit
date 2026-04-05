@@ -848,7 +848,8 @@ add_action('enqueue_block_editor_assets', function() {
                 overrideRestBreaksEnabled: {type:'boolean', default:false},
                 overrideRestBreaks: {type:'string', default:''},
                 overrideTotalTimeEnabled: {type:'boolean', default:false},
-                overrideTotalTime: {type:'string', default:''}
+                overrideTotalTime: {type:'string', default:''},
+                hideGpxStats: {type:'boolean', default:false}
             },
             edit: function(props) {
                 var _ms = wp.element.useState(false);
@@ -942,6 +943,16 @@ add_action('enqueue_block_editor_assets', function() {
                                 wp.element.createElement('strong', null, 'GPS track does not reach the summit'), ' — The zone is centred on the highest point in your track. If you stopped before the peak, use the Activation Zone radius override below or manually enter the activation time.'
                             )
                         )
+                    ),
+                    wp.element.createElement('div', {style:{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', padding:'8px 10px',
+                        background: props.attributes.hideGpxStats ? '\\x23fff3cd' : '\\x23f0f0f0', borderRadius:'4px',
+                        border: props.attributes.hideGpxStats ? '1px solid \\x23f0ad4e' : '1px solid \\x23dddddd'}},
+                        wp.element.createElement('input', {type:'checkbox', id:'hideGpxStats', checked:!!props.attributes.hideGpxStats,
+                            onChange:function(e){props.setAttributes({hideGpxStats:e.target.checked});},
+                            style:{width:'16px',height:'16px',cursor:'pointer',flexShrink:'0'}}),
+                        wp.element.createElement('label', {htmlFor:'hideGpxStats', style:{fontSize:'13px', fontWeight:'700', cursor:'pointer',
+                            color: props.attributes.hideGpxStats ? '\\x23856404' : '\\x23333333', fontFamily:'sans-serif', lineHeight:'1.4'}},
+                            props.attributes.hideGpxStats ? '⛔ GPX hike statistics hidden from post' : 'Hide GPX hike statistics from post')
                     ),
                     wp.element.createElement(wp.components.PanelBody, {title:'⚙️ Statistics Overrides', initialOpen:false},
                         wp.element.createElement('p', {style:{fontSize:'12px', color:'\\x23555555', marginTop:'0', marginBottom:'12px', lineHeight:'1.5'}},
@@ -1126,6 +1137,7 @@ function sota_magic_render_sota_data($atts) {
     $s2s_text = esc_attr(get_option('sota_s2s_text_color'));
     $show_map = get_option('sota_show_contact_map');
     $show_gpx_stats = get_option('sota_show_gpx_stats');
+    $hide_stats_display = !empty($atts['hideGpxStats']);
     $unit_system = get_option('sota_unit_system', 'metric');
 
     // Analyze GPX if available and stats are enabled
@@ -1513,7 +1525,7 @@ function sota_magic_render_sota_data($atts) {
             <p style="color:#888;font-style:italic;margin:10px 0 16px;">Map unavailable — GPX file could not be loaded.</p>
             <?php endif; ?>
 
-            <?php if ($gpx_stats): ?>
+            <?php if ($gpx_stats && !$hide_stats_display): ?>
                 <div class="sota-stats-header">
                     <span class="sota-stats-header-label">Hike Statistics</span>
                     <button class="sota-help-btn" onclick="document.getElementById('sota-stats-modal').classList.add('sota-modal-open')">
