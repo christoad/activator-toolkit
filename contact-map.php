@@ -346,8 +346,8 @@ $sota_magic_leaflet_js  = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/
         First row my_summit field: <strong><?php echo esc_html( $sota_magic_contacts[0]['my_summit'] ?? '(empty)' ); ?></strong><br>
         Contact locations resolved: <strong><?php echo count( $sota_magic_contact_locations ); ?></strong><br>
         Lines drawn: <strong><?php echo ( $sota_magic_summit && count( $sota_magic_contact_locations ) > 0 ) ? count( $sota_magic_contact_locations ) . ' lines' : 'NONE — summit was null'; ?></strong><br>
-        <?php foreach ( $sota_magic_contact_locations as $i => $sota_magic_loc ) : ?>
-        Contact <?php echo $i + 1; ?>: <?php echo esc_html( $sota_magic_loc['callsign'] ); ?> → (<?php echo esc_html( $sota_magic_loc['lat'] ); ?>, <?php echo esc_html( $sota_magic_loc['lon'] ); ?>) via <?php echo esc_html( $sota_magic_loc['location_source'] ); ?><br>
+        <?php foreach ( $sota_magic_contact_locations as $sota_magic_idx => $sota_magic_loc ) : ?>
+        Contact <?php echo esc_html( (string) ( $sota_magic_idx + 1 ) ); ?>: <?php echo esc_html( $sota_magic_loc['callsign'] ); ?> → (<?php echo esc_html( $sota_magic_loc['lat'] ); ?>, <?php echo esc_html( $sota_magic_loc['lon'] ); ?>) via <?php echo esc_html( $sota_magic_loc['location_source'] ); ?><br>
         <?php endforeach; ?>
     </div>
     <?php endif; ?>
