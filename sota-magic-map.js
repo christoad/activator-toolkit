@@ -198,6 +198,8 @@ window.sotaMagicInitMap = function (mapId, data) {
             scales: {
                 x: {
                     type: 'linear',
+                    min: 0,
+                    max: chartX[chartX.length - 1],
                     title: { display: true, text: 'Distance (' + distUnit + ')', font: { size: 11 } },
                     ticks: {
                         maxTicksLimit: 8,

@@ -103,8 +103,9 @@ function sota_magic_get_band_color( $sota_magic_frequency ) {
 $sota_magic_summit = null;
 if ( ! empty( $sota_magic_contacts[0]['my_summit'] ) ) {
     $sota_magic_summit_ref = $sota_magic_contacts[0]['my_summit'];
-    $sota_magic_api_url    = 'https://api2.sota.org.uk/api/summits/' . rawurlencode( $sota_magic_summit_ref );
-    $sota_magic_response   = @file_get_contents( $sota_magic_api_url ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+    $sota_magic_api_url    = 'https://api2.sota.org.uk/api/summits/' . $sota_magic_summit_ref;
+    $sota_magic_context    = stream_context_create( [ 'http' => [ 'timeout' => 30, 'user_agent' => 'SOTA-Magic-Plugin/1.0' ] ] );
+    $sota_magic_response   = @file_get_contents( $sota_magic_api_url, false, $sota_magic_context ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
     if ( $sota_magic_response !== false ) {
         $sota_magic_summit_data = json_decode( $sota_magic_response, true );
         if ( $sota_magic_summit_data && isset( $sota_magic_summit_data['latitude'], $sota_magic_summit_data['longitude'] ) ) {
@@ -328,6 +329,27 @@ $sota_magic_leaflet_js  = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/
                 document.getElementById('loading-overlay').classList.add('hidden');
             }, 500);
         });
+
+        <?php if ( current_user_can( 'manage_options' ) && get_option( 'sota_debug_mode' ) ) : ?>
+        console.log('[SOTA Map Debug] summit:', <?php echo wp_json_encode( $sota_magic_summit ); ?>);
+        console.log('[SOTA Map Debug] contact_locations:', <?php echo wp_json_encode( $sota_magic_contact_locations ); ?>);
+        console.log('[SOTA Map Debug] contacts_raw count:', <?php echo count( $sota_magic_contacts ); ?>);
+        console.log('[SOTA Map Debug] first my_summit field:', <?php echo wp_json_encode( $sota_magic_contacts[0]['my_summit'] ?? 'none' ); ?>);
+        <?php endif; ?>
     </script>
+
+    <?php if ( current_user_can( 'manage_options' ) && get_option( 'sota_debug_mode' ) ) : ?>
+    <div style="position:fixed;bottom:0;left:0;right:0;background:#fff3cd;border-top:2px solid #ffc107;padding:8px 12px;font-size:11px;font-family:monospace;z-index:99999;max-height:35vh;overflow-y:auto;">
+        <strong>🔍 Contact Map Debug (admin only)</strong><br>
+        Summit found: <strong><?php echo $sota_magic_summit ? 'YES — ' . esc_html( $sota_magic_summit['ref'] ) . ' (' . esc_html( $sota_magic_summit['lat'] ) . ', ' . esc_html( $sota_magic_summit['lon'] ) . ')' : 'NO (API returned nothing)'; ?></strong><br>
+        Raw CSV contacts parsed: <strong><?php echo count( $sota_magic_contacts ); ?></strong><br>
+        First row my_summit field: <strong><?php echo esc_html( $sota_magic_contacts[0]['my_summit'] ?? '(empty)' ); ?></strong><br>
+        Contact locations resolved: <strong><?php echo count( $sota_magic_contact_locations ); ?></strong><br>
+        Lines drawn: <strong><?php echo ( $sota_magic_summit && count( $sota_magic_contact_locations ) > 0 ) ? count( $sota_magic_contact_locations ) . ' lines' : 'NONE — summit was null'; ?></strong><br>
+        <?php foreach ( $sota_magic_contact_locations as $i => $sota_magic_loc ) : ?>
+        Contact <?php echo $i + 1; ?>: <?php echo esc_html( $sota_magic_loc['callsign'] ); ?> → (<?php echo esc_html( $sota_magic_loc['lat'] ); ?>, <?php echo esc_html( $sota_magic_loc['lon'] ); ?>) via <?php echo esc_html( $sota_magic_loc['location_source'] ); ?><br>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
 </body>
 </html>

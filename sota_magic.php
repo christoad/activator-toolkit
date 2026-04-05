@@ -480,8 +480,9 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
     // This ensures the activation zone center is the official summit, not the GPX high point,
     // regardless of whether the activation.zone polygon API or radius fallback is used.
     if ($summit_ref) {
-        $sota_api_url = 'https://api2.sota.org.uk/api/summits/' . rawurlencode($summit_ref);
-        $sota_response = @file_get_contents($sota_api_url);
+        $sota_api_url = 'https://api2.sota.org.uk/api/summits/' . $summit_ref;
+        $sota_context = stream_context_create(['http' => ['timeout' => 30, 'user_agent' => 'SOTA-Magic-Plugin/1.0']]);
+        $sota_response = @file_get_contents($sota_api_url, false, $sota_context);
         if ($sota_response) {
             $sota_data = json_decode($sota_response, true);
             if ($sota_data && isset($sota_data['latitude']) && isset($sota_data['longitude'])) {
