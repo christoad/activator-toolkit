@@ -3,7 +3,7 @@ Contributors: ki6cr
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -145,6 +145,12 @@ Yes — Settings → SOTA Magic lets you set background color, text color, trans
 6. Settings page
 
 == Changelog ==
+
+= 1.0.1 =
+* NEW: Per-post "Hide GPX hike statistics from post" checkbox in block editor — suppresses stats display while keeping map, activation zone, and contact map fully functional
+* FIXED: Contact map lines not drawing — SOTA API summit lookup was broken by missing stream context and user-agent header
+* FIXED: Elevation chart showing dead space on the right — Chart.js was auto-extending x-axis beyond actual track length
+* ADDED: Admin-only debug panel on the contact map (visible only when Debug Mode is enabled in Settings)
 
 = 1.0.0 =
 * MAJOR: Plugin is now fully standalone — no other plugins required
