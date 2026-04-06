@@ -14,6 +14,7 @@ if ( ! isset( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_un
 }
 
 // Get and sanitize parameters
+$sota_magic_debug_mode = ( isset( $_GET['debug'] ) && $_GET['debug'] === '1' );
 $sota_magic_csv_url = isset( $_GET['csv'] ) ? esc_url_raw( wp_unslash( $_GET['csv'] ) ) : '';
 if ( ! $sota_magic_csv_url ) {
     echo '<div style="padding:20px;">No CSV file specified</div>';
@@ -330,7 +331,7 @@ $sota_magic_leaflet_js  = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/
             }, 500);
         });
 
-        <?php if ( current_user_can( 'manage_options' ) && get_option( 'sota_debug_mode' ) ) : ?>
+        <?php if ( $sota_magic_debug_mode ) : ?>
         console.log('[SOTA Map Debug] summit:', <?php echo wp_json_encode( $sota_magic_summit ); ?>);
         console.log('[SOTA Map Debug] contact_locations:', <?php echo wp_json_encode( $sota_magic_contact_locations ); ?>);
         console.log('[SOTA Map Debug] contacts_raw count:', <?php echo count( $sota_magic_contacts ); ?>);
@@ -338,7 +339,7 @@ $sota_magic_leaflet_js  = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/
         <?php endif; ?>
     </script>
 
-    <?php if ( current_user_can( 'manage_options' ) && get_option( 'sota_debug_mode' ) ) : ?>
+    <?php if ( $sota_magic_debug_mode ) : ?>
     <div style="position:fixed;bottom:0;left:0;right:0;background:#fff3cd;border-top:2px solid #ffc107;padding:8px 12px;font-size:11px;font-family:monospace;z-index:99999;max-height:35vh;overflow-y:auto;">
         <strong>🔍 Contact Map Debug (admin only)</strong><br>
         Summit found: <strong><?php echo $sota_magic_summit ? 'YES — ' . esc_html( $sota_magic_summit['ref'] ) . ' (' . esc_html( $sota_magic_summit['lat'] ) . ', ' . esc_html( $sota_magic_summit['lon'] ) . ')' : 'NO (API returned nothing)'; ?></strong><br>

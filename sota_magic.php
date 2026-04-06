@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: SOTA Magic
- * Plugin URI: https://ki6cr.com
+ * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
  * Version: 1.0.1
  * Author: KI6CR
@@ -108,8 +108,8 @@ function sota_magic_settings_page() {
     }
     ?>
     <div class="wrap">
-        <h1>🏔️ SOTA Magic Settings</h1>
-        <p style="font-size:12px;color:#666;"><em>Created by KI6CR - Version 1.0.0</em></p>
+        <h1><img src="<?php echo esc_url(plugins_url('lib/sota-magic-logo-40.png', __FILE__)); ?>" alt="SOTA Magic" style="height:40px;vertical-align:middle;margin-right:10px;">SOTA Magic Settings</h1>
+        <p style="font-size:12px;color:#666;"><em>Created by KI6CR - Version 1.0.1</em></p>
         
         <form method="post" action="">
             <?php wp_nonce_field('sota_magic_settings'); ?>
@@ -141,10 +141,6 @@ function sota_magic_settings_page() {
                     <input type="checkbox" name="sota_use_azapi" value="1" <?php checked(1, get_option('sota_use_azapi')); ?> />
                     <br><small>Query <a href="https://activation.zone" target="_blank">activation.zone</a> (by N6ARA) for precise activation zone geometry based on terrain data. If disabled or API fails, falls back to radius method.</small>
                 </td></tr>
-                <tr><th>Show Debug Info</th><td>
-                    <input type="checkbox" name="sota_debug_mode" value="1" <?php checked(1, get_option('sota_debug_mode')); ?> />
-                    <br><small>Show technical debugging information below GPX stats (only visible to admins). Useful for troubleshooting API issues.</small>
-                </td></tr>
                 <tr><th>Show GPX Statistics</th><td><input type="checkbox" name="sota_show_gpx_stats" value="1" <?php checked(1, get_option('sota_show_gpx_stats')); ?> /><br><small>Display hiking time, activation time, and other statistics</small></td></tr>
                 <tr><th>Unit System</th><td>
                     <select name="sota_unit_system">
@@ -175,6 +171,15 @@ function sota_magic_settings_page() {
                 <tr><th>Show Contact Map</th><td><input type="checkbox" name="sota_show_contact_map" value="1" <?php checked(1, get_option('sota_show_contact_map')); ?> /></td></tr>
                 <tr><th>QRZ Username</th><td><input type="text" name="sota_qrz_username" value="<?php echo esc_attr(get_option('sota_qrz_username')); ?>" class="regular-text" /><br><small>Your QRZ.com callsign</small></td></tr>
                 <tr><th>QRZ Password</th><td><input type="password" name="sota_qrz_password" value="<?php echo esc_attr(get_option('sota_qrz_password')); ?>" class="regular-text" /><br><small>Your QRZ.com password</small></td></tr>
+
+                <tr><th colspan="2"><h2>Developer Tools</h2></th></tr>
+                <tr><th>Debug Mode</th><td>
+                    <input type="checkbox" name="sota_debug_mode" value="1" <?php checked(1, get_option('sota_debug_mode')); ?> />
+                    <br><small>Shows technical debug panels <strong>visible only to logged-in admins</strong>. Enables two panels simultaneously:
+                    <br>• <strong>GPX stats page</strong> — API response details, polygon vertex count, points-in-zone count, and speed ranges below the hiking statistics
+                    <br>• <strong>Contact map</strong> — summit lookup result, contacts resolved, per-contact location source, and lines-drawn count
+                    <br>Useful for troubleshooting activation zone detection or missing contact pins. Safe to leave off in normal use.</small>
+                </td></tr>
             </table>
             <?php submit_button('Save Settings', 'primary', 'sota_magic_save'); ?>
         </form>
@@ -1189,7 +1194,8 @@ function sota_magic_render_sota_data($atts) {
     // Build map iframe URL if needed
     $map_iframe_url = '';
     if ($show_map && $csv_url) {
-        $map_iframe_url = plugins_url('contact-map.php', __FILE__) . '?csv=' . urlencode($csv_url) . '&_nonce=' . wp_create_nonce('sota_magic_contact_map');
+        $sota_magic_debug_param = (current_user_can('manage_options') && get_option('sota_debug_mode')) ? '&debug=1' : '';
+        $map_iframe_url = plugins_url('contact-map.php', __FILE__) . '?csv=' . urlencode($csv_url) . '&_nonce=' . wp_create_nonce('sota_magic_contact_map') . $sota_magic_debug_param;
     }
 
     // Unique map ID for this block (static counter survives multiple blocks on one page)
