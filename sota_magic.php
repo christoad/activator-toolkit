@@ -1189,6 +1189,10 @@ function sota_magic_render_sota_data($atts) {
         if ($force_radius_zone) {
             $gpx_stats['using_api'] = false;
         }
+        // Recalculate hiking speed from (possibly overridden) distance and time
+        $gpx_stats['hiking_speed'] = ($gpx_stats['hiking_time'] > 0)
+            ? $gpx_stats['hiking_distance'] / ($gpx_stats['hiking_time'] / 3600)
+            : 0;
     }
     
     // Build map iframe URL if needed
