@@ -1,0 +1,129 @@
+<!-- Banner Hero -->
+<div style="text-align:center; padding:0 0 2rem;">
+  <img src="https://www.ki6cr.com/wp-content/plugins/sota-magic/lib/sota-magic-banner.png" alt="SOTA Magic — The Summit Activator's WordPress Toolkit" style="width:100%; border-radius:8px; display:block;">
+  <p style="font-size:1.15em; opacity:0.85; margin:1.5rem 0;">
+    A WordPress plugin for amateur radio operators — turn your SOTA activation GPX tracks and CSV logs into a beautiful, interactive post in minutes.
+  </p>
+  <a href="https://github.com/christoad/sota-magic" style="background:#F9F6DE; color:#3f5762; padding:0.75em 1.75em; border-radius:2rem; text-decoration:none; font-weight:bold;">⬇ Download on GitHub</a>
+</div>
+
+<hr>
+
+<!-- GPX Map -->
+<h2>Interactive GPX Track Map</h2>
+<p>Upload your GPX file and SOTA Magic renders a full interactive map with your track, a summit peak marker, and the precise SOTA activation zone boundary. Switch between Topographic, OpenStreetMap, and Minimal base layers. An elevation profile chart sits directly below the map — hover it to watch a dot track your position across the map in real time.</p>
+<img src="https://www.ki6cr.com/wp-content/plugins/sota-magic/screenshot-1.png" alt="GPX track map with elevation chart and Zoom to Activation Zone button" style="width:100%; border-radius:8px; margin:1rem auto 2rem; display:block;">
+
+<hr>
+
+<!-- Hike Stats -->
+<h2>Automatic Hike Statistics</h2>
+<p>SOTA Magic analyzes your GPS track and calculates everything automatically — hiking time, activation time, rest breaks, distance, elevation gain and loss, average speed, and peak elevation. It uses the <a href="https://activation.zone">Activation.Zone API</a> for precise terrain-based zone detection (with a configurable radius fallback). Every stat has a manual override field in the block editor if you need to correct anything.</p>
+<img src="https://www.ki6cr.com/wp-content/plugins/sota-magic/screenshot-2.png" alt="Hike statistics grid showing time, distance, elevation, and speed" style="width:100%; border-radius:8px; margin:1rem auto 2rem; display:block;">
+
+<hr>
+
+<!-- Contacts Table -->
+<h2>Activation Logbook</h2>
+<p>Your SOTA CSV log is parsed and displayed as a clean, responsive contacts table. Summit-to-Summit contacts are automatically detected and highlighted in a custom color of your choosing. The table scrolls horizontally on mobile so nothing gets cut off.</p>
+<img src="https://www.ki6cr.com/wp-content/plugins/sota-magic/screenshot-3.png" alt="Activation logbook table with S2S contact highlighted" style="width:100%; border-radius:8px; margin:1rem auto 2rem; display:block;">
+
+<hr>
+
+<!-- Contact Map -->
+<h2>Interactive Contact Map</h2>
+<p>See exactly where your QSOs were located on an interactive map, with color-coded markers by band and lines drawn back to your summit. S2S contacts are pinned using official SOTA API coordinates. Regular contacts use QRZ.com lookups, or Maidenhead grid squares if included in your log comments — no QRZ subscription needed for those.</p>
+<img src="https://www.ki6cr.com/wp-content/plugins/sota-magic/screenshot-4.png" alt="Interactive contact map showing QSO locations by band" style="width:100%; border-radius:8px; margin:1rem auto 2rem; display:block;">
+
+<hr>
+
+<!-- Block Editor -->
+<h2>Simple Block Editor Interface</h2>
+<p>Everything is controlled from a single Gutenberg block. Upload your GPX and CSV files, and the plugin handles the rest. The Statistics Overrides panel lets you manually correct any individual stat — just check the box next to the field you want to override and type in your value. No re-uploading files required.</p>
+<img src="https://www.ki6cr.com/wp-content/plugins/sota-magic/screenshot-5.png" alt="Gutenberg block editor showing file upload and manual override panel" style="width:100%; border-radius:8px; margin:1rem auto 2rem; display:block;">
+
+<hr>
+
+<!-- Settings -->
+<h2>Fully Customizable</h2>
+<p>Settings → SOTA Magic gives you control over colors, fonts, headlines, unit system (metric or imperial), activation zone method, and more. Every SOTAMAGIC block on your site inherits these defaults — or you can override individual values per block.</p>
+<img src="https://www.ki6cr.com/wp-content/plugins/sota-magic/screenshot-6.png" alt="SOTA Magic settings page" style="width:100%; border-radius:8px; margin:1rem auto 2rem; display:block;">
+
+<hr>
+
+<!-- How it works -->
+<h2>How It Works</h2>
+<ol>
+  <li>Download the zip from <a href="https://github.com/christoad/sota-magic">GitHub</a> and install via <strong>Plugins → Add New → Upload Plugin</strong>.</li>
+  <li>Go to <strong>Settings → SOTA Magic</strong> and configure your preferences — units, colors, QRZ credentials, and more.</li>
+  <li>In any post or page, add the <strong>SOTAMAGIC</strong> Gutenberg block.</li>
+  <li>Upload your <code>.gpx</code> track file and/or your SOTA CSV log export.</li>
+  <li>Publish or preview — everything generates automatically.</li>
+</ol>
+
+<hr>
+
+<!-- Feature grid -->
+<h2>Features at a Glance</h2>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin:1.5rem 0;">
+
+  <div style="background:rgba(255,255,255,0.07); border-radius:6px; padding:1.25rem;">
+    <strong>🗺️ Mapping</strong>
+    <ul style="margin:0.75rem 0 0; padding-left:1.2rem;">
+      <li>Leaflet map, 3 base layers</li>
+      <li>GPX track with summit peak marker</li>
+      <li>Activation zone polygon or radius circle</li>
+      <li>Zoom to Activation Zone button</li>
+    </ul>
+  </div>
+
+  <div style="background:rgba(255,255,255,0.07); border-radius:6px; padding:1.25rem;">
+    <strong>📊 Statistics</strong>
+    <ul style="margin:0.75rem 0 0; padding-left:1.2rem;">
+      <li>Hiking time, activation time, rest breaks</li>
+      <li>Distance, elevation gain/loss</li>
+      <li>Average speed, peak elevation</li>
+      <li>Metric or imperial units</li>
+    </ul>
+  </div>
+
+  <div style="background:rgba(255,255,255,0.07); border-radius:6px; padding:1.25rem;">
+    <strong>📡 Contacts</strong>
+    <ul style="margin:0.75rem 0 0; padding-left:1.2rem;">
+      <li>Responsive contacts table</li>
+      <li>S2S highlighting with custom colors</li>
+      <li>Contact map with band color coding</li>
+      <li>Maidenhead grid square support</li>
+    </ul>
+  </div>
+
+  <div style="background:rgba(255,255,255,0.07); border-radius:6px; padding:1.25rem;">
+    <strong>⚙️ Customization</strong>
+    <ul style="margin:0.75rem 0 0; padding-left:1.2rem;">
+      <li>Colors, fonts, headlines</li>
+      <li>Manual stat overrides per block</li>
+      <li>Multiple blocks per page</li>
+      <li>QRZ.com integration for contact locations</li>
+    </ul>
+  </div>
+
+</div>
+
+<hr>
+
+<!-- Requirements -->
+<h2>Requirements</h2>
+<ul>
+  <li>WordPress 6.0 or later</li>
+  <li>PHP 7.4 or later</li>
+  <li>QRZ.com XML subscription (optional — only needed for contact map QRZ lookups)</li>
+</ul>
+
+<hr>
+
+<!-- CTA -->
+<div style="text-align:center; padding:2rem 0;">
+  <h2 style="margin-top:0;">Get SOTA Magic</h2>
+  <p>Free and open source. Download the latest release from GitHub.</p>
+  <a href="https://github.com/christoad/sota-magic" style="background:#F9F6DE; color:#3f5762; padding:0.75em 1.75em; border-radius:2rem; text-decoration:none; font-weight:bold;">View on GitHub</a>
+</div>
