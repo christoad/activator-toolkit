@@ -206,7 +206,7 @@ function sota_magic_get_activation_zone_from_api($summit_ref, $summit_lat, $summ
         'summit_lat' => floatval($summit_lat),
         'summit_long' => floatval($summit_lon),
         'summit_alt' => intval(round($summit_alt)),  // Must be integer!
-        'deg_delta' => 0.001,  // Search within ~110m of summit (changed from 0.01)
+        'deg_delta' => 0.040,  // Matches activation.zone web UI default for precise terrain polygon
         'sota_summit_alt_thres' => 25  // SOTA rule: 25m vertical drop
     );
     
