@@ -3,7 +3,7 @@
  * Plugin Name: SOTA Magic
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
@@ -15,6 +15,62 @@
  */
 
 if (!defined('ABSPATH')) exit;
+
+// Create (or upgrade) the locations cache table
+function sota_magic_create_locations_table() {
+    global $wpdb;
+    $table   = $wpdb->prefix . 'sota_magic_locations';
+    $charset = $wpdb->get_charset_collate();
+    $sql = "CREATE TABLE IF NOT EXISTS $table (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        cache_key varchar(50) NOT NULL,
+        lat decimal(10,6) NOT NULL,
+        lon decimal(10,6) NOT NULL,
+        label varchar(150) NOT NULL DEFAULT '',
+        source varchar(20) NOT NULL DEFAULT 'qrz',
+        expires_at datetime DEFAULT NULL,
+        cached_at datetime NOT NULL,
+        PRIMARY KEY (id),
+        UNIQUE KEY cache_key (cache_key)
+    ) $charset;";
+    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+    dbDelta($sql);
+    update_option('sota_magic_db_version', '1.0');
+}
+register_activation_hook(__FILE__, 'sota_magic_create_locations_table');
+add_action('plugins_loaded', function() {
+    if (get_option('sota_magic_db_version') !== '1.0') {
+        sota_magic_create_locations_table();
+    }
+});
+
+/**
+ * Encrypt a credential using AES-256-CBC keyed from WordPress secret keys.
+ * Encrypted values are prefixed with 'enc:' for migration detection.
+ */
+function sota_magic_encrypt_credential($value) {
+    if (empty($value) || !function_exists('openssl_encrypt')) return $value;
+    $key = substr(hash('sha256', AUTH_KEY . SECURE_AUTH_KEY), 0, 32);
+    $iv  = openssl_random_pseudo_bytes(16);
+    $enc = openssl_encrypt($value, 'AES-256-CBC', $key, 0, $iv);
+    return 'enc:' . base64_encode($iv . $enc);
+}
+
+/**
+ * Decrypt a credential encrypted by sota_magic_encrypt_credential().
+ * Falls back to returning the raw value if not encrypted (plain text migration).
+ */
+function sota_magic_decrypt_credential($value) {
+    if (empty($value)) return '';
+    if (strpos($value, 'enc:') !== 0) return $value; // plain text fallback
+    if (!function_exists('openssl_decrypt')) return '';
+    $key     = substr(hash('sha256', AUTH_KEY . SECURE_AUTH_KEY), 0, 32);
+    $decoded = base64_decode(substr($value, 4));
+    $iv      = substr($decoded, 0, 16);
+    $enc     = substr($decoded, 16);
+    $result  = openssl_decrypt($enc, 'AES-256-CBC', $key, 0, $iv);
+    return ($result !== false) ? $result : '';
+}
 
 // Add Settings link
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), function($links) {
@@ -61,11 +117,12 @@ add_action('admin_init', function() {
         'sota_activation_zone_radius' => '50',
         'sota_rest_threshold_minutes' => '3',
         'sota_use_azapi' => 1,
-        'sota_debug_mode' => 0,
+        'sota_debug_mode'        => 0,
+        'sota_debug_mode_public' => 0,
         'sota_default_map_layer' => 'topo'
     ];
     $color_keys   = ['sota_bg_color', 'sota_text_color', 'sota_s2s_highlight', 'sota_s2s_text_color'];
-    $boolean_keys = ['sota_is_transparent', 'sota_use_theme_font', 'sota_show_contact_map', 'sota_show_gpx_stats', 'sota_use_azapi', 'sota_debug_mode'];
+    $boolean_keys = ['sota_is_transparent', 'sota_use_theme_font', 'sota_show_contact_map', 'sota_show_gpx_stats', 'sota_use_azapi', 'sota_debug_mode', 'sota_debug_mode_public'];
     foreach ($options as $key => $default) {
         if (in_array($key, $color_keys, true)) {
             $sanitize = 'sanitize_hex_color';
@@ -95,7 +152,10 @@ function sota_magic_settings_page() {
         update_option('sota_s2s_text_color', sanitize_hex_color(wp_unslash($_POST['sota_s2s_text_color'] ?? '')));
         update_option('sota_show_contact_map', isset($_POST['sota_show_contact_map']) ? 1 : 0);
         update_option('sota_qrz_username', sanitize_text_field(wp_unslash($_POST['sota_qrz_username'] ?? '')));
-        update_option('sota_qrz_password', sanitize_text_field(wp_unslash($_POST['sota_qrz_password'] ?? '')));
+        $sota_magic_new_pass = sanitize_text_field(wp_unslash($_POST['sota_qrz_password'] ?? ''));
+        if (!empty($sota_magic_new_pass)) {
+            update_option('sota_qrz_password', sota_magic_encrypt_credential($sota_magic_new_pass));
+        }
         update_option('sota_show_gpx_stats', isset($_POST['sota_show_gpx_stats']) ? 1 : 0);
         update_option('sota_stationary_threshold', sanitize_text_field(wp_unslash($_POST['sota_stationary_threshold'] ?? '')));
         update_option('sota_unit_system', sanitize_text_field(wp_unslash($_POST['sota_unit_system'] ?? '')));
@@ -109,7 +169,10 @@ function sota_magic_settings_page() {
     ?>
     <div class="wrap">
         <h1><img src="<?php echo esc_url(plugins_url('lib/sota-magic-logo-40.png', __FILE__)); ?>" alt="SOTA Magic" style="height:40px;vertical-align:middle;margin-right:10px;">SOTA Magic Settings</h1>
-        <p style="font-size:12px;color:#666;"><em>Created by KI6CR - Version 1.0.1</em></p>
+        <?php
+        $sota_magic_data = get_plugin_data( __FILE__ );
+        ?>
+        <p style="font-size:12px;color:#666;"><em>Created by KI6CR &mdash; Version <?php echo esc_html( $sota_magic_data['Version'] ); ?></em></p>
         
         <form method="post" action="">
             <?php wp_nonce_field('sota_magic_settings'); ?>
@@ -170,15 +233,18 @@ function sota_magic_settings_page() {
                 </p></th></tr>
                 <tr><th>Show Contact Map</th><td><input type="checkbox" name="sota_show_contact_map" value="1" <?php checked(1, get_option('sota_show_contact_map')); ?> /></td></tr>
                 <tr><th>QRZ Username</th><td><input type="text" name="sota_qrz_username" value="<?php echo esc_attr(get_option('sota_qrz_username')); ?>" class="regular-text" /><br><small>Your QRZ.com callsign</small></td></tr>
-                <tr><th>QRZ Password</th><td><input type="password" name="sota_qrz_password" value="<?php echo esc_attr(get_option('sota_qrz_password')); ?>" class="regular-text" /><br><small>Your QRZ.com password</small></td></tr>
+                <tr><th>QRZ Password</th><td><input type="password" name="sota_qrz_password" value="" placeholder="<?php echo get_option('sota_qrz_password') ? esc_attr('(saved — leave blank to keep current password)') : ''; ?>" class="regular-text" /><br><small>Your QRZ.com password. Leave blank to keep the current saved password.</small></td></tr>
 
                 <tr><th colspan="2"><h2>Developer Tools</h2></th></tr>
-                <tr><th>Debug Mode</th><td>
+                <tr><th>Debug Mode (admin only)</th><td>
                     <input type="checkbox" name="sota_debug_mode" value="1" <?php checked(1, get_option('sota_debug_mode')); ?> />
-                    <br><small>Shows technical debug panels <strong>visible only to logged-in admins</strong>. Enables two panels simultaneously:
-                    <br>• <strong>GPX stats page</strong> — API response details, polygon vertex count, points-in-zone count, and speed ranges below the hiking statistics
-                    <br>• <strong>Contact map</strong> — summit lookup result, contacts resolved, per-contact location source, and lines-drawn count
-                    <br>Useful for troubleshooting activation zone detection or missing contact pins. Safe to leave off in normal use.</small>
+                    <br><small>Shows technical debug panels <strong>visible only to logged-in admins</strong>. Safe to leave on without affecting public visitors. Enables two panels:
+                    <br>• <strong>GPX stats page</strong> — API response details, polygon vertex count, points-in-zone count, and speed ranges
+                    <br>• <strong>Contact map</strong> — summit lookup result, contacts resolved, per-contact location source, and lines-drawn count</small>
+                </td></tr>
+                <tr><th>Debug Mode (public)</th><td>
+                    <input type="checkbox" name="sota_debug_mode_public" value="1" <?php checked(1, get_option('sota_debug_mode_public')); ?> />
+                    <br><small>Same debug panels as above but <strong>visible to all visitors</strong> — use temporarily when testing while logged out. Disable when done.</small>
                 </td></tr>
             </table>
             <?php submit_button('Save Settings', 'primary', 'sota_magic_save'); ?>
@@ -507,12 +573,38 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
     $api_debug_message = 'Not attempted';
 
     if ($use_azapi && $summit_ref && !$force_radius) {
-        $api_result = sota_magic_get_activation_zone_from_api($summit_ref, $summit_lat, $summit_lon, $max_elevation);
-        if (is_array($api_result)) {
-            $activation_zone_polygon = $api_result['polygon'];
-            $api_debug_message = $api_result['debug'];
-            if ($activation_zone_polygon) {
-                $using_api = true;
+        $sota_magic_az_cache_key = 'sota_magic_az_' . sanitize_key($summit_ref);
+        // Read directly from DB to bypass object cache
+        global $wpdb;
+        $sota_magic_az_raw = $wpdb->get_var($wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
+            $sota_magic_az_cache_key
+        ));
+        $sota_magic_az_cached = false;
+        if ($sota_magic_az_raw !== null) {
+            $sota_magic_az_entry = maybe_unserialize($sota_magic_az_raw);
+            if (is_array($sota_magic_az_entry) && isset($sota_magic_az_entry['expires']) && time() < $sota_magic_az_entry['expires']) {
+                $sota_magic_az_cached = $sota_magic_az_entry['data'];
+            }
+        }
+        if ($sota_magic_az_cached !== false) {
+            $activation_zone_polygon = $sota_magic_az_cached;
+            $api_debug_message       = 'Loaded from cache (terrain polygon — cached 365 days)';
+            if ($activation_zone_polygon) $using_api = true;
+        } else {
+            $api_result = sota_magic_get_activation_zone_from_api($summit_ref, $summit_lat, $summit_lon, $max_elevation);
+            if (is_array($api_result)) {
+                $activation_zone_polygon = $api_result['polygon'];
+                $api_debug_message       = $api_result['debug'];
+                if ($activation_zone_polygon) {
+                    $using_api = true;
+                    $wpdb->replace($wpdb->options, [
+                        'option_name'  => $sota_magic_az_cache_key,
+                        'option_value' => maybe_serialize(['data' => $activation_zone_polygon, 'expires' => time() + 365 * DAY_IN_SECONDS]),
+                        'autoload'     => 'no',
+                    ]);
+                    $api_debug_message .= ' | Cached for 365 days';
+                }
             }
         }
     }
@@ -833,8 +925,23 @@ add_action('init', function() {
     ]);
 });
 
+// AJAX: Clear QRZ location cache
+add_action('wp_ajax_sota_magic_clear_qrz_cache', function() {
+    check_ajax_referer('sota_magic_clear_qrz_cache');
+    if (!current_user_can('manage_options')) wp_send_json_error('Unauthorized.');
+    global $wpdb;
+    $table   = $wpdb->prefix . 'sota_magic_locations';
+    $count   = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table");
+    $wpdb->query("TRUNCATE TABLE $table");
+    wp_send_json_success($count . ' cached location(s) cleared. Fresh lookups will run on next map load.');
+});
+
 add_action('enqueue_block_editor_assets', function() {
     wp_register_script('sota-editor-js', '', ['wp-blocks','wp-element','wp-editor','wp-components'], '1.0.0', true);
+    wp_localize_script('sota-editor-js', 'sotaMagicAdmin', [
+        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'nonce'   => wp_create_nonce('sota_magic_clear_qrz_cache'),
+    ]);
     wp_add_inline_script('sota-editor-js', "
         wp.blocks.registerBlockType('ki6cr/sota-data', {
             title: 'SOTAMAGIC',
@@ -1102,6 +1209,43 @@ add_action('enqueue_block_editor_assets', function() {
                                         background: props.attributes.overrideTotalTimeEnabled ? '\\x23ffffff' : '\\x23eeeeee',
                                         color: props.attributes.overrideTotalTimeEnabled ? '\\x23000000' : '\\x23aaaaaa'}})
                             )
+                        ),
+                        // --- QRZ Cache Refresh ---
+                        wp.element.createElement('div', {style:{marginTop:'16px', paddingTop:'12px', borderTop:'1px solid \\x23e0e0e0'}},
+                            wp.element.createElement('p', {style:{fontSize:'11px', color:'\\x23666666', fontFamily:'sans-serif', margin:'0 0 8px'}},
+                                '🗺️ QRZ Location Cache'
+                            ),
+                            wp.element.createElement('button', {
+                                style:{
+                                    width:'100%', padding:'7px 12px', fontSize:'12px', fontFamily:'sans-serif',
+                                    background:'\\x23f0f0f0', border:'1px solid \\x23cccccc', borderRadius:'3px',
+                                    cursor:'pointer', color:'\\x23333333'
+                                },
+                                onClick: function(e) {
+                                    e.preventDefault();
+                                    var btn = e.target;
+                                    btn.disabled = true;
+                                    btn.textContent = 'Clearing...';
+                                    fetch(sotaMagicAdmin.ajaxUrl, {
+                                        method: 'POST',
+                                        headers: {'Content-Type':'application/x-www-form-urlencoded'},
+                                        body: 'action=sota_magic_clear_qrz_cache&_ajax_nonce=' + sotaMagicAdmin.nonce
+                                    })
+                                    .then(function(r){ return r.json(); })
+                                    .then(function(data){
+                                        btn.textContent = data.success ? '✓ ' + data.data : '✗ Error';
+                                        btn.style.background = data.success ? '\\x23d4edda' : '\\x23f8d7da';
+                                        setTimeout(function(){
+                                            btn.textContent = 'Force QRZ Refresh (clear cache)';
+                                            btn.style.background = '\\x23f0f0f0';
+                                            btn.disabled = false;
+                                        }, 4000);
+                                    });
+                                }
+                            }, 'Force QRZ Refresh (clear cache)'),
+                            wp.element.createElement('p', {style:{fontSize:'10px', color:'\\x23999999', fontFamily:'sans-serif', margin:'6px 0 0'}},
+                                'Clears cached QRZ locations for all contacts site-wide. Fresh lookups run on next map load.'
+                            )
                         )
                     )
                 );
@@ -1198,7 +1342,7 @@ function sota_magic_render_sota_data($atts) {
     // Build map iframe URL if needed
     $map_iframe_url = '';
     if ($show_map && $csv_url) {
-        $sota_magic_debug_param = (current_user_can('manage_options') && get_option('sota_debug_mode')) ? '&debug=1' : '';
+        $sota_magic_debug_param = (get_option('sota_debug_mode_public') || (get_option('sota_debug_mode') && current_user_can('manage_options'))) ? '&debug=1' : '';
         $map_iframe_url = plugins_url('contact-map.php', __FILE__) . '?csv=' . urlencode($csv_url) . '&_nonce=' . wp_create_nonce('sota_magic_contact_map') . $sota_magic_debug_param;
     }
 
@@ -1679,9 +1823,9 @@ function sota_magic_render_sota_data($atts) {
                 </script>
 
                 <!-- Debug info -->
-                <?php if (current_user_can('manage_options') && get_option('sota_debug_mode')): ?>
+                <?php if (get_option('sota_debug_mode_public') || (get_option('sota_debug_mode') && current_user_can('manage_options'))): ?>
                 <div style="margin-top:10px; padding:10px; background:#fff3cd; border:1px solid #ffc107; border-radius:5px; font-size:12px; font-family:monospace;">
-                    <strong>🔍 Debug Info (only visible to admins):</strong><br>
+                    <strong>🔍 Debug Info:</strong><br>
                     API Enabled: <?php echo get_option('sota_use_azapi') ? 'YES' : 'NO'; ?><br>
                     CSV URL: <?php echo $csv_url ? 'Present' : 'Missing'; ?><br>
                     Summit Reference: <?php echo esc_html(isset($gpx_stats['summit_ref']) ? $gpx_stats['summit_ref'] : 'Not extracted'); ?><br>

@@ -13,6 +13,40 @@ if ( ! isset( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_un
     wp_die( 'Invalid request.' );
 }
 
+/**
+ * Look up a cached location row from the dedicated locations table.
+ * Returns object with lat/lon/label/source, or null if not found / expired.
+ */
+function sota_magic_location_read( $cache_key ) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'sota_magic_locations';
+    return $wpdb->get_row( $wpdb->prepare(
+        "SELECT lat, lon, label, source FROM $table
+         WHERE cache_key = %s
+           AND (expires_at IS NULL OR expires_at > NOW())
+         LIMIT 1",
+        $cache_key
+    ) );
+}
+
+/**
+ * Store a location in the dedicated locations table.
+ * Pass $expires_seconds = 0 for permanent storage.
+ */
+function sota_magic_location_write( $cache_key, $lat, $lon, $label, $source, $expires_seconds = 0 ) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'sota_magic_locations';
+    $wpdb->replace( $table, [
+        'cache_key'  => $cache_key,
+        'lat'        => $lat,
+        'lon'        => $lon,
+        'label'      => $label,
+        'source'     => $source,
+        'expires_at' => $expires_seconds > 0 ? gmdate( 'Y-m-d H:i:s', time() + $expires_seconds ) : null,
+        'cached_at'  => gmdate( 'Y-m-d H:i:s' ),
+    ] );
+}
+
 // Get and sanitize parameters
 $sota_magic_debug_mode = ( isset( $_GET['debug'] ) && $_GET['debug'] === '1' );
 $sota_magic_csv_url = isset( $_GET['csv'] ) ? esc_url_raw( wp_unslash( $_GET['csv'] ) ) : '';
@@ -23,7 +57,7 @@ if ( ! $sota_magic_csv_url ) {
 
 // Get QRZ credentials
 $sota_magic_qrz_user = get_option( 'sota_qrz_username' );
-$sota_magic_qrz_pass = get_option( 'sota_qrz_password' );
+$sota_magic_qrz_pass = sota_magic_decrypt_credential( get_option( 'sota_qrz_password' ) );
 
 // Parse CSV via wp_remote_get
 $sota_magic_contacts = [];
@@ -100,22 +134,35 @@ function sota_magic_get_band_color( $sota_magic_frequency ) {
     return '#999999';
 }
 
-// Get summit location from SOTA API
+// Get summit location from SOTA API (cached 90 days in locations table)
 $sota_magic_summit = null;
 if ( ! empty( $sota_magic_contacts[0]['my_summit'] ) ) {
     $sota_magic_summit_ref = $sota_magic_contacts[0]['my_summit'];
-    $sota_magic_api_url    = 'https://api2.sota.org.uk/api/summits/' . $sota_magic_summit_ref;
-    $sota_magic_context    = stream_context_create( [ 'http' => [ 'timeout' => 30, 'user_agent' => 'SOTA-Magic-Plugin/1.0' ] ] );
-    $sota_magic_response   = @file_get_contents( $sota_magic_api_url, false, $sota_magic_context ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-    if ( $sota_magic_response !== false ) {
-        $sota_magic_summit_data = json_decode( $sota_magic_response, true );
-        if ( $sota_magic_summit_data && isset( $sota_magic_summit_data['latitude'], $sota_magic_summit_data['longitude'] ) ) {
-            $sota_magic_summit = [
-                'lat'  => floatval( $sota_magic_summit_data['latitude'] ),
-                'lon'  => floatval( $sota_magic_summit_data['longitude'] ),
-                'name' => $sota_magic_summit_data['name'] ?? $sota_magic_summit_ref,
-                'ref'  => $sota_magic_summit_ref,
-            ];
+    $sota_magic_summit_key = 'summit_' . sanitize_key( $sota_magic_summit_ref );
+    $sota_magic_summit_row = sota_magic_location_read( $sota_magic_summit_key );
+    if ( $sota_magic_summit_row ) {
+        $sota_magic_summit = [
+            'lat'  => floatval( $sota_magic_summit_row->lat ),
+            'lon'  => floatval( $sota_magic_summit_row->lon ),
+            'name' => $sota_magic_summit_row->label ?: $sota_magic_summit_ref,
+            'ref'  => $sota_magic_summit_ref,
+        ];
+    } else {
+        $sota_magic_api_url  = 'https://api2.sota.org.uk/api/summits/' . $sota_magic_summit_ref;
+        $sota_magic_context  = stream_context_create( [ 'http' => [ 'timeout' => 30, 'user_agent' => 'SOTA-Magic-Plugin/1.0' ] ] );
+        $sota_magic_response = @file_get_contents( $sota_magic_api_url, false, $sota_magic_context ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+        if ( $sota_magic_response !== false ) {
+            $sota_magic_summit_data = json_decode( $sota_magic_response, true );
+            if ( $sota_magic_summit_data && isset( $sota_magic_summit_data['latitude'], $sota_magic_summit_data['longitude'] ) ) {
+                $sota_magic_summit_name = $sota_magic_summit_data['name'] ?? $sota_magic_summit_ref;
+                $sota_magic_summit = [
+                    'lat'  => floatval( $sota_magic_summit_data['latitude'] ),
+                    'lon'  => floatval( $sota_magic_summit_data['longitude'] ),
+                    'name' => $sota_magic_summit_name,
+                    'ref'  => $sota_magic_summit_ref,
+                ];
+                sota_magic_location_write( $sota_magic_summit_key, $sota_magic_summit['lat'], $sota_magic_summit['lon'], $sota_magic_summit_name, 'sota', 90 * DAY_IN_SECONDS );
+            }
         }
     }
 }
@@ -135,6 +182,8 @@ if ( $sota_magic_qrz_user && $sota_magic_qrz_pass ) {
 
 // Get locations for all contacts
 $sota_magic_contact_locations = [];
+$sota_magic_unresolved        = [];
+$sota_magic_qrz_fail_debug    = []; // Only populated in debug mode
 foreach ( $sota_magic_contacts as $sota_magic_contact ) {
     $sota_magic_callsign   = $sota_magic_contact['callsign'];
     $sota_magic_comments   = $sota_magic_contact['comments'];
@@ -160,51 +209,109 @@ foreach ( $sota_magic_contacts as $sota_magic_contact ) {
         continue;
     }
 
-    // Priority 2: S2S — use SOTA API summit coordinates
+    // Priority 2: S2S — use SOTA API summit coordinates (cached 90 days in locations table)
     if ( $sota_magic_is_s2s ) {
-        $sota_magic_their_api_url  = 'https://api2.sota.org.uk/api/summits/' . rawurlencode( $sota_magic_contact['their_summit'] );
-        $sota_magic_their_response = @file_get_contents( $sota_magic_their_api_url ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-        if ( $sota_magic_their_response !== false ) {
-            $sota_magic_their_data = json_decode( $sota_magic_their_response, true );
-            if ( $sota_magic_their_data && isset( $sota_magic_their_data['latitude'], $sota_magic_their_data['longitude'] ) ) {
-                $sota_magic_contact_locations[] = [
-                    'callsign'        => $sota_magic_callsign,
-                    'lat'             => floatval( $sota_magic_their_data['latitude'] ),
-                    'lon'             => floatval( $sota_magic_their_data['longitude'] ),
-                    'summit'          => $sota_magic_contact['their_summit'],
-                    'mode'            => $sota_magic_contact['mode'],
-                    'frequency'       => $sota_magic_contact['frequency'],
-                    'is_s2s'          => true,
-                    'color'           => $sota_magic_band_color,
-                    'location_source' => 'sota',
-                ];
+        $sota_magic_their_ref = $sota_magic_contact['their_summit'];
+        $sota_magic_s2s_key   = 'summit_' . sanitize_key( $sota_magic_their_ref );
+        $sota_magic_s2s_row   = sota_magic_location_read( $sota_magic_s2s_key );
+        if ( $sota_magic_s2s_row ) {
+            $sota_magic_contact_locations[] = [
+                'callsign'        => $sota_magic_callsign,
+                'lat'             => floatval( $sota_magic_s2s_row->lat ),
+                'lon'             => floatval( $sota_magic_s2s_row->lon ),
+                'summit'          => $sota_magic_their_ref,
+                'mode'            => $sota_magic_contact['mode'],
+                'frequency'       => $sota_magic_contact['frequency'],
+                'is_s2s'          => true,
+                'color'           => $sota_magic_band_color,
+                'location_source' => 'sota',
+                'cached'          => true,
+            ];
+        } else {
+            $sota_magic_their_api_url  = 'https://api2.sota.org.uk/api/summits/' . $sota_magic_their_ref;
+            $sota_magic_their_context  = stream_context_create( [ 'http' => [ 'timeout' => 15, 'user_agent' => 'SOTA-Magic-Plugin/1.0' ] ] );
+            $sota_magic_their_response = @file_get_contents( $sota_magic_their_api_url, false, $sota_magic_their_context ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+            if ( $sota_magic_their_response !== false ) {
+                $sota_magic_their_data = json_decode( $sota_magic_their_response, true );
+                if ( $sota_magic_their_data && isset( $sota_magic_their_data['latitude'], $sota_magic_their_data['longitude'] ) ) {
+                    $sota_magic_s2s_lat = floatval( $sota_magic_their_data['latitude'] );
+                    $sota_magic_s2s_lon = floatval( $sota_magic_their_data['longitude'] );
+                    sota_magic_location_write( $sota_magic_s2s_key, $sota_magic_s2s_lat, $sota_magic_s2s_lon, $sota_magic_their_ref, 'sota', 90 * DAY_IN_SECONDS );
+                    $sota_magic_contact_locations[] = [
+                        'callsign'        => $sota_magic_callsign,
+                        'lat'             => $sota_magic_s2s_lat,
+                        'lon'             => $sota_magic_s2s_lon,
+                        'summit'          => $sota_magic_their_ref,
+                        'mode'            => $sota_magic_contact['mode'],
+                        'frequency'       => $sota_magic_contact['frequency'],
+                        'is_s2s'          => true,
+                        'color'           => $sota_magic_band_color,
+                        'location_source' => 'sota',
+                        'cached'          => false,
+                    ];
+                } else {
+                    $sota_magic_unresolved[] = [ 'callsign' => $sota_magic_callsign, 'reason' => 'SOTA API returned no coordinates for ' . $sota_magic_their_ref ];
+                }
+            } else {
+                $sota_magic_unresolved[] = [ 'callsign' => $sota_magic_callsign, 'reason' => 'SOTA API unreachable for ' . $sota_magic_their_ref ];
             }
         }
         continue;
     }
 
-    // Priority 3: QRZ.com home address lookup
+    // Priority 3: QRZ.com home address lookup (stored permanently in locations table)
     if ( $sota_magic_qrz_session ) {
-        $sota_magic_qrz_url      = 'https://xmldata.qrz.com/xml/current/?s=' . rawurlencode( $sota_magic_qrz_session ) . '&callsign=' . rawurlencode( $sota_magic_callsign );
-        $sota_magic_qrz_response = @file_get_contents( $sota_magic_qrz_url ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-        if ( $sota_magic_qrz_response ) {
-            preg_match( '/<lat>([^<]+)<\/lat>/', $sota_magic_qrz_response, $sota_magic_lat_match );
-            preg_match( '/<lon>([^<]+)<\/lon>/', $sota_magic_qrz_response, $sota_magic_lon_match );
-            if ( ! empty( $sota_magic_lat_match[1] ) && ! empty( $sota_magic_lon_match[1] ) ) {
-                $sota_magic_contact_locations[] = [
-                    'callsign'        => $sota_magic_callsign,
-                    'lat'             => floatval( $sota_magic_lat_match[1] ),
-                    'lon'             => floatval( $sota_magic_lon_match[1] ),
-                    'summit'          => '',
-                    'mode'            => $sota_magic_contact['mode'],
-                    'frequency'       => $sota_magic_contact['frequency'],
-                    'is_s2s'          => false,
-                    'color'           => $sota_magic_band_color,
-                    'location_source' => 'qrz',
-                ];
+        $sota_magic_qrz_key = 'qrz_' . sanitize_key( strtolower( $sota_magic_callsign ) );
+        $sota_magic_qrz_row = sota_magic_location_read( $sota_magic_qrz_key );
+        if ( $sota_magic_qrz_row ) {
+            $sota_magic_contact_locations[] = [
+                'callsign'        => $sota_magic_callsign,
+                'lat'             => floatval( $sota_magic_qrz_row->lat ),
+                'lon'             => floatval( $sota_magic_qrz_row->lon ),
+                'summit'          => '',
+                'mode'            => $sota_magic_contact['mode'],
+                'frequency'       => $sota_magic_contact['frequency'],
+                'is_s2s'          => false,
+                'color'           => $sota_magic_band_color,
+                'location_source' => 'qrz',
+                'cached'          => true,
+            ];
+        } else {
+            $sota_magic_qrz_url      = 'https://xmldata.qrz.com/xml/current/?s=' . rawurlencode( $sota_magic_qrz_session ) . '&callsign=' . rawurlencode( $sota_magic_callsign );
+            $sota_magic_qrz_context  = stream_context_create( [ 'http' => [ 'timeout' => 15, 'user_agent' => 'SOTA-Magic-Plugin/1.0' ] ] );
+            $sota_magic_qrz_response = @file_get_contents( $sota_magic_qrz_url, false, $sota_magic_qrz_context ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+            if ( $sota_magic_qrz_response ) {
+                preg_match( '/<lat>([^<]+)<\/lat>/', $sota_magic_qrz_response, $sota_magic_lat_match );
+                preg_match( '/<lon>([^<]+)<\/lon>/', $sota_magic_qrz_response, $sota_magic_lon_match );
+                if ( ! empty( $sota_magic_lat_match[1] ) && ! empty( $sota_magic_lon_match[1] ) ) {
+                    $sota_magic_qrz_lat = floatval( $sota_magic_lat_match[1] );
+                    $sota_magic_qrz_lon = floatval( $sota_magic_lon_match[1] );
+                    sota_magic_location_write( $sota_magic_qrz_key, $sota_magic_qrz_lat, $sota_magic_qrz_lon, $sota_magic_callsign, 'qrz', 0 );
+                    $sota_magic_contact_locations[] = [
+                        'callsign'        => $sota_magic_callsign,
+                        'lat'             => $sota_magic_qrz_lat,
+                        'lon'             => $sota_magic_qrz_lon,
+                        'summit'          => '',
+                        'mode'            => $sota_magic_contact['mode'],
+                        'frequency'       => $sota_magic_contact['frequency'],
+                        'is_s2s'          => false,
+                        'color'           => $sota_magic_band_color,
+                        'location_source' => 'qrz',
+                        'cached'          => false,
+                    ];
+                } else {
+                    $sota_magic_unresolved[] = [ 'callsign' => $sota_magic_callsign, 'reason' => 'No coordinates in QRZ response' ];
+                    if ( $sota_magic_debug_mode ) {
+                        $sota_magic_qrz_fail_debug[ $sota_magic_callsign ] = substr( $sota_magic_qrz_response, 0, 1000 );
+                    }
+                }
+            } else {
+                $sota_magic_unresolved[] = [ 'callsign' => $sota_magic_callsign, 'reason' => 'QRZ HTTP request failed' ];
             }
+            usleep( 500000 ); // Rate limit: 0.5s between QRZ calls (only on cache miss)
         }
-        usleep( 500000 ); // Rate limit: 0.5s between QRZ calls
+    } else {
+        $sota_magic_unresolved[] = [ 'callsign' => $sota_magic_callsign, 'reason' => 'No QRZ credentials configured' ];
     }
 }
 
@@ -331,6 +438,24 @@ $sota_magic_leaflet_js  = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/
             }, 500);
         });
 
+        <?php if ( ! empty( $sota_magic_unresolved ) ) : ?>
+        var unresolvedContacts = <?php echo wp_json_encode( $sota_magic_unresolved ); ?>;
+        var UnresolvedControl = L.Control.extend({
+            options: { position: 'bottomleft' },
+            onAdd: function() {
+                var div = L.DomUtil.create('div', '');
+                div.style.cssText = 'background:white;border-radius:4px;padding:8px 12px;font-size:12px;font-family:sans-serif;max-width:240px;box-shadow:0 1px 5px rgba(0,0,0,0.3);line-height:1.6;';
+                var html = '<strong style="color:#555;">&#9888; No location found</strong><br>';
+                unresolvedContacts.forEach(function(c) {
+                    html += '<span style="color:#888;">&bull; ' + c.callsign + '</span><br>';
+                });
+                div.innerHTML = html;
+                return div;
+            }
+        });
+        new UnresolvedControl().addTo(map);
+        <?php endif; ?>
+
         <?php if ( $sota_magic_debug_mode ) : ?>
         console.log('[SOTA Map Debug] summit:', <?php echo wp_json_encode( $sota_magic_summit ); ?>);
         console.log('[SOTA Map Debug] contact_locations:', <?php echo wp_json_encode( $sota_magic_contact_locations ); ?>);
@@ -347,9 +472,44 @@ $sota_magic_leaflet_js  = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/
         First row my_summit field: <strong><?php echo esc_html( $sota_magic_contacts[0]['my_summit'] ?? '(empty)' ); ?></strong><br>
         Contact locations resolved: <strong><?php echo count( $sota_magic_contact_locations ); ?></strong><br>
         Lines drawn: <strong><?php echo ( $sota_magic_summit && count( $sota_magic_contact_locations ) > 0 ) ? count( $sota_magic_contact_locations ) . ' lines' : 'NONE — summit was null'; ?></strong><br>
+        <?php
+        $sota_magic_cached_count = 0;
+        $sota_magic_fresh_count  = 0;
+        foreach ( $sota_magic_contact_locations as $sota_magic_loc ) {
+            if ( ! empty( $sota_magic_loc['cached'] ) ) $sota_magic_cached_count++;
+            else $sota_magic_fresh_count++;
+        }
+        ?>
+        Cache hits: <strong><?php echo $sota_magic_cached_count; ?></strong> &nbsp;|&nbsp; Fresh lookups: <strong><?php echo $sota_magic_fresh_count; ?></strong> &nbsp;|&nbsp; Unresolved: <strong><?php echo count( $sota_magic_unresolved ); ?></strong><br>
+        <?php
+        global $wpdb;
+        $sota_magic_loc_table  = $wpdb->prefix . 'sota_magic_locations';
+        $sota_magic_total_rows = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $sota_magic_loc_table" );
+        $sota_magic_db_error   = $wpdb->last_error;
+        ?>
+        <hr style="margin:4px 0;">
+        Locations table: <strong><?php echo esc_html( $sota_magic_loc_table ); ?></strong> — <strong><?php echo $sota_magic_total_rows; ?> row(s) stored</strong><br>
+        DB error: <strong><?php echo $sota_magic_db_error ? esc_html( $sota_magic_db_error ) : 'none'; ?></strong><br>
+        <hr style="margin:4px 0;">
         <?php foreach ( $sota_magic_contact_locations as $sota_magic_idx => $sota_magic_loc ) : ?>
-        Contact <?php echo esc_html( (string) ( $sota_magic_idx + 1 ) ); ?>: <?php echo esc_html( $sota_magic_loc['callsign'] ); ?> → (<?php echo esc_html( $sota_magic_loc['lat'] ); ?>, <?php echo esc_html( $sota_magic_loc['lon'] ); ?>) via <?php echo esc_html( $sota_magic_loc['location_source'] ); ?><br>
+        <?php $sota_magic_cache_label = isset( $sota_magic_loc['cached'] ) ? ( $sota_magic_loc['cached'] ? ' <span style="color:#28a745;">✓ cached</span>' : ' <span style="color:#fd7e14;">⬇ fresh fetch</span>' ) : ''; ?>
+        Contact <?php echo esc_html( (string) ( $sota_magic_idx + 1 ) ); ?>: <?php echo esc_html( $sota_magic_loc['callsign'] ); ?> → (<?php echo esc_html( $sota_magic_loc['lat'] ); ?>, <?php echo esc_html( $sota_magic_loc['lon'] ); ?>) via <?php echo esc_html( $sota_magic_loc['location_source'] ); ?><?php echo $sota_magic_cache_label; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- controlled HTML ?><br>
         <?php endforeach; ?>
+        <?php if ( ! empty( $sota_magic_unresolved ) ) : ?>
+        <hr style="margin:4px 0;">
+        <strong style="color:#c0392b;">⚠ Unresolved contacts (not shown on map):</strong><br>
+        <?php foreach ( $sota_magic_unresolved as $sota_magic_ur ) : ?>
+        &nbsp;• <strong><?php echo esc_html( $sota_magic_ur['callsign'] ); ?></strong> — <?php echo esc_html( $sota_magic_ur['reason'] ); ?><br>
+        <?php endforeach; ?>
+        <?php endif; ?>
+        <?php if ( ! empty( $sota_magic_qrz_fail_debug ) ) : ?>
+        <hr style="margin:4px 0;">
+        <strong>QRZ raw responses (failed lookups):</strong><br>
+        <?php foreach ( $sota_magic_qrz_fail_debug as $sota_magic_cs => $sota_magic_raw ) : ?>
+        <em><?php echo esc_html( $sota_magic_cs ); ?>:</em><br>
+        <pre style="font-size:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto;background:#f8f8f8;padding:4px;"><?php echo esc_html( $sota_magic_raw ); ?></pre>
+        <?php endforeach; ?>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </body>

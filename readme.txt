@@ -3,7 +3,7 @@ Contributors: ki6cr
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -145,6 +145,16 @@ Yes — Settings → SOTA Magic lets you set background color, text color, trans
 6. Settings page
 
 == Changelog ==
+
+= 1.0.2 =
+* NEW: Persistent location cache using a dedicated `wp_sota_magic_locations` database table — QRZ callsign locations stored permanently for historical accuracy; SOTA summit coordinates cached 90 days
+* NEW: "No location found" panel on contact map — contacts that could not be located are listed rather than silently dropped
+* NEW: Debug Mode split into two options — admin-only (safe to leave on) and public (for testing while logged out)
+* IMPROVED: QRZ callsign lookups now include a user-agent header, fixing lookups that were silently failing
+* IMPROVED: Settings page version number is now read dynamically from the plugin header — always stays in sync
+* IMPROVED: Debug panel now shows unresolved contact count, reason per callsign, and raw QRZ XML response for failed lookups
+* FIXED: Hiking speed statistic not recalculating when hiking distance or time manual overrides were applied
+* FIXED: QRZ password now stored encrypted (AES-256-CBC) rather than plain text
 
 = 1.0.1 =
 * NEW: Per-post "Hide GPX hike statistics from post" checkbox in block editor — suppresses stats display while keeping map, activation zone, and contact map fully functional
