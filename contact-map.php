@@ -422,17 +422,21 @@ $sota_magic_leaflet_js  = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/
         <?php endif; ?>
         <?php endforeach; ?>
 
-        <?php if ( $sota_magic_summit && count( $sota_magic_contact_locations ) > 0 ) : ?>
-        var bounds = L.latLngBounds([
-            [<?php echo floatval( $sota_magic_summit['lat'] ); ?>, <?php echo floatval( $sota_magic_summit['lon'] ); ?>]
-            <?php foreach ( $sota_magic_contact_locations as $sota_magic_loc ) : ?>
-            ,[<?php echo floatval( $sota_magic_loc['lat'] ); ?>, <?php echo floatval( $sota_magic_loc['lon'] ); ?>]
-            <?php endforeach; ?>
-        ]);
-        map.fitBounds(bounds, {padding: [50, 50]});
+        var allPoints = [];
+        <?php if ( $sota_magic_summit ) : ?>
+        allPoints.push([<?php echo floatval( $sota_magic_summit['lat'] ); ?>, <?php echo floatval( $sota_magic_summit['lon'] ); ?>]);
         <?php endif; ?>
+        <?php foreach ( $sota_magic_contact_locations as $sota_magic_loc ) : ?>
+        allPoints.push([<?php echo floatval( $sota_magic_loc['lat'] ); ?>, <?php echo floatval( $sota_magic_loc['lon'] ); ?>]);
+        <?php endforeach; ?>
 
         map.whenReady(function() {
+            map.invalidateSize();
+            if (allPoints.length > 1) {
+                map.fitBounds(L.latLngBounds(allPoints), {padding: [50, 50]});
+            } else if (allPoints.length === 1) {
+                map.setView(allPoints[0], 10);
+            }
             setTimeout(function() {
                 document.getElementById('loading-overlay').classList.add('hidden');
             }, 500);

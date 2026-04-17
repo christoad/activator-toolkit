@@ -3,7 +3,7 @@ Contributors: ki6cr
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -145,6 +145,9 @@ Yes — Settings → SOTA Magic lets you set background color, text color, trans
 6. Settings page
 
 == Changelog ==
+
+= 1.0.3 =
+* FIXED: Contact map initial zoom now fits all contacts and summit optimally — map waits for container to fully render before fitting bounds
 
 = 1.0.2 =
 * NEW: Persistent location cache using a dedicated `wp_sota_magic_locations` database table — QRZ callsign locations stored permanently for historical accuracy; SOTA summit coordinates cached 90 days
