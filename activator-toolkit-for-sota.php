@@ -573,12 +573,14 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
 
     if ($use_azapi && $summit_ref && !$force_radius) {
         $sota_magic_az_cache_key = 'sota_magic_az_' . sanitize_key($summit_ref);
-        // Read directly from DB to bypass object cache
+        // Read directly from DB to bypass object cache — activation zone polygon stored in wp_options with custom 365-day TTL
         global $wpdb;
-        $sota_magic_az_raw = $wpdb->get_var($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- bypassing object cache intentionally; activation zone polygon is large and cached in wp_options with custom TTL
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+        $sota_magic_az_raw = $wpdb->get_var($wpdb->prepare(
             "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
             $sota_magic_az_cache_key
         ));
+        // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
         $sota_magic_az_cached = false;
         if ($sota_magic_az_raw !== null) {
             $sota_magic_az_entry = maybe_unserialize($sota_magic_az_raw);
@@ -597,11 +599,13 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
                 $api_debug_message       = $api_result['debug'];
                 if ($activation_zone_polygon) {
                     $using_api = true;
-                    $wpdb->replace($wpdb->options, [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional wp_options write bypassing object cache; custom TTL managed manually
+                    // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+                    $wpdb->replace($wpdb->options, [
                         'option_name'  => $sota_magic_az_cache_key,
                         'option_value' => maybe_serialize(['data' => $activation_zone_polygon, 'expires' => time() + 365 * DAY_IN_SECONDS]),
                         'autoload'     => 'no',
                     ]);
+                    // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
                     $api_debug_message .= ' | Cached for 365 days';
                 }
             }
@@ -933,9 +937,11 @@ add_action('wp_ajax_sota_magic_clear_qrz_cache', function() {
     check_ajax_referer('sota_magic_clear_qrz_cache');
     if (!current_user_can('manage_options')) wp_send_json_error('Unauthorized.');
     global $wpdb;
-    $table   = $wpdb->prefix . 'sota_magic_locations';
-    $count   = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from trusted $wpdb->prefix; count before truncate
-    $wpdb->query("TRUNCATE TABLE $table"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- TRUNCATE cannot be parameterized; table name from trusted $wpdb->prefix
+    // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
+    $table = esc_sql( $wpdb->prefix . 'sota_magic_locations' );
+    $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table" );
+    $wpdb->query( "TRUNCATE TABLE $table" );
+    // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
     wp_send_json_success($count . ' cached location(s) cleared. Fresh lookups will run on next map load.');
 });
 

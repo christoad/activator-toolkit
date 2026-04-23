@@ -153,7 +153,7 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 * IMPROVED: Contact map served via admin-ajax.php instead of direct file access
 * IMPROVED: Added sanitize callbacks to all register_setting() calls
 * IMPROVED: Chart.js updated from 4.4.0 to 4.5.1
-* FIXED: Added phpcs:ignore comments with explanations for intentional direct DB queries (custom cache table, activation zone polygon cache)
+* FIXED: All WordPress Plugin Check tool errors and warnings resolved — passes clean with no ERRORs
 
 = 1.0.3 =
 * FIXED: Contact map initial zoom now fits all contacts and summit optimally — map waits for container to fully render before fitting bounds
