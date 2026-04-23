@@ -1,14 +1,14 @@
 <?php
 /**
- * Plugin Name: SOTA Magic
+ * Plugin Name: Activator Toolkit for SOTA
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
- * Version: 1.0.3
+ * Version: 1.0.4
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: sota-magic
+ * Text Domain: activator-toolkit-for-sota
  * Requires at least: 6.0
  * Tested up to: 6.9
  * Requires PHP: 7.4
@@ -74,7 +74,7 @@ function sota_magic_decrypt_credential($value) {
 
 // Add Settings link
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), function($links) {
-    array_unshift($links, '<a href="options-general.php?page=sota-magic-settings">Settings</a>');
+    array_unshift($links, '<a href="options-general.php?page=activator-toolkit-settings">Settings</a>');
     return $links;
 });
 
@@ -92,47 +92,52 @@ add_filter('wp_check_filetype_and_ext', function($data, $file, $filename) {
     return $data;
 }, 10, 3);
 
+// Sanitize helpers for register_setting
+function sota_magic_sanitize_float( $value ) {
+    return (string) floatval( $value );
+}
+function sota_magic_sanitize_unit_system( $value ) {
+    return in_array( $value, [ 'metric', 'imperial' ], true ) ? $value : 'metric';
+}
+function sota_magic_sanitize_map_layer( $value ) {
+    return in_array( $value, [ 'topo', 'osm', 'carto' ], true ) ? $value : 'topo';
+}
+function sota_magic_sanitize_password( $value ) {
+    return $value; // stored encrypted; do not alter via settings API
+}
+
 // SETTINGS
 add_action('admin_menu', function() {
-    add_options_page('SOTA Magic Settings', 'SOTA Magic', 'manage_options', 'sota-magic-settings', 'sota_magic_settings_page');
+    add_options_page('Activator Toolkit for SOTA Settings', 'Activator Toolkit for SOTA', 'manage_options', 'activator-toolkit-settings', 'sota_magic_settings_page');
 });
 
 add_action('admin_init', function() {
     $options = [
-        'sota_headline_gpx'   => 'Activation GPS Track',
-        'sota_headline_csv'   => 'Activation Contacts',
-        'sota_headline_map'   => 'Contact Map',
-        'sota_bg_color'       => '#ffffff',
-        'sota_text_color'     => '#333333',
-        'sota_is_transparent' => 0,
-        'sota_use_theme_font' => 0,
-        'sota_s2s_highlight'  => '#ffebee',
-        'sota_s2s_text_color' => '#d32f2f',
-        'sota_show_contact_map' => 1,
-        'sota_qrz_username'   => '',
-        'sota_qrz_password'   => '',
-        'sota_show_gpx_stats' => 1,
-        'sota_stationary_threshold' => '0.3',
-        'sota_unit_system'    => 'metric',
-        'sota_activation_zone_radius' => '50',
-        'sota_rest_threshold_minutes' => '3',
-        'sota_use_azapi' => 1,
-        'sota_debug_mode'        => 0,
-        'sota_debug_mode_public' => 0,
-        'sota_default_map_layer' => 'topo'
+        'sota_headline_gpx'           => [ 'sanitize_text_field',            'Activation GPS Track' ],
+        'sota_headline_csv'           => [ 'sanitize_text_field',            'Activation Contacts' ],
+        'sota_headline_map'           => [ 'sanitize_text_field',            'Contact Map' ],
+        'sota_bg_color'               => [ 'sanitize_hex_color',             '#ffffff' ],
+        'sota_text_color'             => [ 'sanitize_hex_color',             '#333333' ],
+        'sota_is_transparent'         => [ 'absint',                         0 ],
+        'sota_use_theme_font'         => [ 'absint',                         0 ],
+        'sota_s2s_highlight'          => [ 'sanitize_hex_color',             '#ffebee' ],
+        'sota_s2s_text_color'         => [ 'sanitize_hex_color',             '#d32f2f' ],
+        'sota_show_contact_map'       => [ 'absint',                         1 ],
+        'sota_qrz_username'           => [ 'sanitize_text_field',            '' ],
+        'sota_qrz_password'           => [ 'sota_magic_sanitize_password',   '' ],
+        'sota_show_gpx_stats'         => [ 'absint',                         1 ],
+        'sota_stationary_threshold'   => [ 'sota_magic_sanitize_float',      '0.3' ],
+        'sota_unit_system'            => [ 'sota_magic_sanitize_unit_system','metric' ],
+        'sota_activation_zone_radius' => [ 'absint',                         50 ],
+        'sota_rest_threshold_minutes' => [ 'absint',                         3 ],
+        'sota_use_azapi'              => [ 'absint',                         1 ],
+        'sota_debug_mode'             => [ 'absint',                         0 ],
+        'sota_debug_mode_public'      => [ 'absint',                         0 ],
+        'sota_default_map_layer'      => [ 'sota_magic_sanitize_map_layer',  'topo' ],
     ];
-    $color_keys   = ['sota_bg_color', 'sota_text_color', 'sota_s2s_highlight', 'sota_s2s_text_color'];
-    $boolean_keys = ['sota_is_transparent', 'sota_use_theme_font', 'sota_show_contact_map', 'sota_show_gpx_stats', 'sota_use_azapi', 'sota_debug_mode', 'sota_debug_mode_public'];
-    foreach ($options as $key => $default) {
-        if (in_array($key, $color_keys, true)) {
-            $sanitize = 'sanitize_hex_color';
-        } elseif (in_array($key, $boolean_keys, true)) {
-            $sanitize = 'absint';
-        } else {
-            $sanitize = 'sanitize_text_field';
-        }
-        register_setting('sota_magic_group', $key, ['sanitize_callback' => $sanitize]);
-        if (get_option($key) === false) update_option($key, $default);
+    foreach ( $options as $key => [ $sanitize, $default ] ) {
+        register_setting( 'sota_magic_group', $key, [ 'sanitize_callback' => $sanitize ] );
+        if ( get_option( $key ) === false ) update_option( $key, $default );
     }
 });
 
@@ -168,7 +173,7 @@ function sota_magic_settings_page() {
     }
     ?>
     <div class="wrap">
-        <h1><img src="<?php echo esc_url(plugins_url('lib/sota-magic-logo-40.png', __FILE__)); ?>" alt="SOTA Magic" style="height:40px;vertical-align:middle;margin-right:10px;">SOTA Magic Settings</h1>
+        <h1><img src="<?php echo esc_url(plugins_url('lib/activator-toolkit-logo-40.png', __FILE__)); ?>" alt="Activator Toolkit for SOTA" style="height:40px;vertical-align:middle;margin-right:10px;">Activator Toolkit for SOTA Settings</h1>
         <?php
         $sota_magic_data = get_plugin_data( __FILE__ );
         ?>
@@ -279,34 +284,28 @@ function sota_magic_get_activation_zone_from_api($summit_ref, $summit_lat, $summ
     $json_data = json_encode($data_array);
     $debug .= "JSON: " . $json_data . " | Calling API | ";
     
-    $options = array(
-        'http' => array(
-            'method'  => 'POST',
-            'header'  => 'Content-Type: application/json' . "\r\n" .
-                         'Accept: application/json' . "\r\n",
-            'content' => $json_data,
-            'timeout' => 30,
-            'user_agent' => 'SOTA-Magic-Plugin/0.517',
-            'ignore_errors' => true
-        )
-    );
-    
-    $context = stream_context_create($options);
-    $result = @file_get_contents($api_url, false, $context);
-    
-    if ($result === false) {
-        $error = error_get_last();
-        $debug .= "API call failed: " . ($error ? $error['message'] : 'Unknown error');
+    $wp_response = wp_remote_post( $api_url, [
+        'timeout' => 30,
+        'headers' => [
+            'Content-Type' => 'application/json',
+            'Accept'       => 'application/json',
+        ],
+        'body'       => $json_data,
+        'user-agent' => 'SOTA-Magic-Plugin/0.517',
+    ] );
+
+    if ( is_wp_error( $wp_response ) ) {
+        $debug .= "API call failed: " . $wp_response->get_error_message();
         return ['polygon' => null, 'debug' => $debug];
     }
     
+    $result = wp_remote_retrieve_body( $wp_response );
     $debug .= "Response received (" . strlen($result) . " bytes) | ";
-    
+
     // Check HTTP response code
-    if (isset($http_response_header)) {
-        $debug .= "Status: " . $http_response_header[0] . " | ";
-    }
-    
+    $http_status = wp_remote_retrieve_response_code( $wp_response );
+    $debug .= "Status: " . $http_status . " | ";
+
     // Parse response
     $response = json_decode($result, true);
     if (!$response) {
@@ -482,11 +481,11 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
     $use_azapi = get_option('sota_use_azapi', 1);
     
     // Download and parse GPX
-    $gpx_content = @file_get_contents($gpx_url);
-    if (!$gpx_content) {
-        return null;
-    }
-    
+    $gpx_response = wp_remote_get( $gpx_url, [ 'timeout' => 30 ] );
+    if ( is_wp_error( $gpx_response ) ) return null;
+    $gpx_content = wp_remote_retrieve_body( $gpx_response );
+    if ( ! $gpx_content ) return null;
+
     $xml = @simplexml_load_string($gpx_content);
     if (!$xml) {
         return null;
@@ -551,9 +550,9 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
     // This ensures the activation zone center is the official summit, not the GPX high point,
     // regardless of whether the activation.zone polygon API or radius fallback is used.
     if ($summit_ref) {
-        $sota_api_url = 'https://api2.sota.org.uk/api/summits/' . $summit_ref;
-        $sota_context = stream_context_create(['http' => ['timeout' => 30, 'user_agent' => 'SOTA-Magic-Plugin/1.0']]);
-        $sota_response = @file_get_contents($sota_api_url, false, $sota_context);
+        $sota_api_url  = 'https://api2.sota.org.uk/api/summits/' . $summit_ref;
+        $sota_wp_resp  = wp_remote_get( $sota_api_url, [ 'timeout' => 30, 'user-agent' => 'SOTA-Magic-Plugin/1.0' ] );
+        $sota_response = ! is_wp_error( $sota_wp_resp ) ? wp_remote_retrieve_body( $sota_wp_resp ) : '';
         if ($sota_response) {
             $sota_data = json_decode($sota_response, true);
             if ($sota_data && isset($sota_data['latitude']) && isset($sota_data['longitude'])) {
@@ -576,7 +575,7 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
         $sota_magic_az_cache_key = 'sota_magic_az_' . sanitize_key($summit_ref);
         // Read directly from DB to bypass object cache
         global $wpdb;
-        $sota_magic_az_raw = $wpdb->get_var($wpdb->prepare(
+        $sota_magic_az_raw = $wpdb->get_var($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- bypassing object cache intentionally; activation zone polygon is large and cached in wp_options with custom TTL
             "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
             $sota_magic_az_cache_key
         ));
@@ -598,7 +597,7 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
                 $api_debug_message       = $api_result['debug'];
                 if ($activation_zone_polygon) {
                     $using_api = true;
-                    $wpdb->replace($wpdb->options, [
+                    $wpdb->replace($wpdb->options, [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional wp_options write bypassing object cache; custom TTL managed manually
                         'option_name'  => $sota_magic_az_cache_key,
                         'option_value' => maybe_serialize(['data' => $activation_zone_polygon, 'expires' => time() + 365 * DAY_IN_SECONDS]),
                         'autoload'     => 'no',
@@ -786,7 +785,9 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
  * Used when GPX stats are disabled but we still need coordinates for the map.
  */
 function sota_get_gpx_track_points($gpx_url, $max_points = 800) {
-    $gpx_content = @file_get_contents($gpx_url);
+    $gpx_response = wp_remote_get( $gpx_url, [ 'timeout' => 30 ] );
+    if ( is_wp_error( $gpx_response ) ) return [];
+    $gpx_content = wp_remote_retrieve_body( $gpx_response );
     if (!$gpx_content) return [];
     $xml = @simplexml_load_string($gpx_content);
     if (!$xml) return [];
@@ -919,9 +920,11 @@ function sota_magic_get_speed_unit($unit_system = 'metric') {
 
 // BLOCK REGISTRATION
 add_action('init', function() {
+    wp_register_style( 'activator-toolkit', plugins_url( 'activator-toolkit.css', __FILE__ ), [], '1.0.3' );
     register_block_type('ki6cr/sota-data', [
-        'editor_script' => 'sota-editor-js',
-        'render_callback' => 'sota_magic_render_sota_data'
+        'editor_script'   => 'sota-editor-js',
+        'style'           => 'activator-toolkit',
+        'render_callback' => 'sota_magic_render_sota_data',
     ]);
 });
 
@@ -931,9 +934,51 @@ add_action('wp_ajax_sota_magic_clear_qrz_cache', function() {
     if (!current_user_can('manage_options')) wp_send_json_error('Unauthorized.');
     global $wpdb;
     $table   = $wpdb->prefix . 'sota_magic_locations';
-    $count   = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table");
-    $wpdb->query("TRUNCATE TABLE $table");
+    $count   = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from trusted $wpdb->prefix; count before truncate
+    $wpdb->query("TRUNCATE TABLE $table"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- TRUNCATE cannot be parameterized; table name from trusted $wpdb->prefix
     wp_send_json_success($count . ' cached location(s) cleared. Fresh lookups will run on next map load.');
+});
+
+// AJAX: Serve the contact map iframe page
+function sota_magic_render_contact_map_ajax() {
+    if ( ! isset( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_nonce'] ) ), 'sota_magic_contact_map' ) ) {
+        wp_die( 'Invalid request.', '', [ 'response' => 403 ] );
+    }
+    include plugin_dir_path( __FILE__ ) . 'contact-map.php';
+    wp_die();
+}
+add_action( 'wp_ajax_sota_magic_contact_map',        'sota_magic_render_contact_map_ajax' );
+add_action( 'wp_ajax_nopriv_sota_magic_contact_map', 'sota_magic_render_contact_map_ajax' );
+
+// Enqueue frontend stylesheet + dynamic color overrides
+add_action('wp_enqueue_scripts', function() {
+
+    $bg             = get_option('sota_is_transparent') ? 'transparent' : get_option('sota_bg_color', '#ffffff');
+    $text           = get_option('sota_text_color', '#333333');
+    $font           = get_option('sota_use_theme_font') ? 'inherit' : 'sans-serif';
+    $s2s_bg         = get_option('sota_s2s_highlight', '#ffebee');
+    $s2s_text       = get_option('sota_s2s_text_color', '#d32f2f');
+    $is_transparent = (bool) get_option('sota_is_transparent');
+    $box_shadow     = $is_transparent ? '' : 'box-shadow:0 5px 20px rgba(0,0,0,0.1);';
+    $stat_bg        = $is_transparent ? 'rgba(255,255,255,0.05)' : esc_attr($bg) . '22';
+    $stat_box_bg    = $is_transparent ? 'rgba(255,255,255,0.1)' : '#fff';
+    $stat_box_shad  = $is_transparent ? '' : 'box-shadow:0 2px 5px rgba(0,0,0,0.05);';
+
+    $dynamic_css = "
+        .sota-main-container{background:" . esc_attr($bg) . ";color:" . esc_attr($text) . ";font-family:" . esc_attr($font) . ";" . $box_shadow . "}
+        .sota-main-container h3{color:" . esc_attr($text) . ";border-bottom-color:" . esc_attr($text) . "44;}
+        .sota-gpx-stats{background:" . $stat_bg . ";border-color:" . esc_attr($text) . "22;}
+        .sota-stat-box{background:" . $stat_box_bg . ";" . $stat_box_shad . "}
+        .sota-stat-value{color:" . esc_attr($text) . ";}
+        .sota-stat-label{color:" . esc_attr($text) . "99;}
+        .sota-stat-secondary{color:" . esc_attr($text) . "77;}
+        .sota-table{color:" . esc_attr($text) . ";}
+        .sota-table th{border-bottom-color:" . esc_attr($text) . "66;}
+        .sota-table td{border-bottom-color:" . esc_attr($text) . "22;}
+        .s2s-row td{background:" . esc_attr($s2s_bg) . "!important;color:" . esc_attr($s2s_text) . "!important;}
+        .s2s-badge{background:" . esc_attr($s2s_text) . ";}
+    ";
+    wp_add_inline_style( 'activator-toolkit', $dynamic_css );
 });
 
 add_action('enqueue_block_editor_assets', function() {
@@ -944,7 +989,7 @@ add_action('enqueue_block_editor_assets', function() {
     ]);
     wp_add_inline_script('sota-editor-js', "
         wp.blocks.registerBlockType('ki6cr/sota-data', {
-            title: 'SOTAMAGIC',
+            title: 'Activator Toolkit',
             icon: 'location-alt',
             category: 'common',
             attributes: {
@@ -970,9 +1015,9 @@ add_action('enqueue_block_editor_assets', function() {
                 return wp.element.createElement('div', {
                     style:{padding:'25px', background:'\\x23f5f5f5', border:'2px dashed \\x230073aa', borderRadius:'8px', textAlign:'center'}
                 },
-                    wp.element.createElement('h3', {style:{margin:'0 0 10px 0', color:'\\x230073aa'}}, '🏔️ SOTAMAGIC'),
+                    wp.element.createElement('h3', {style:{margin:'0 0 10px 0', color:'\\x230073aa'}}, '🏔️ Activator Toolkit'),
                     wp.element.createElement('p', {style:{color:'\\x23d32f2f', fontWeight:'bold', margin:'0 0 10px 0'}}, '⚠️ Map and table visible in Preview only'),
-                    wp.element.createElement('p', {style:{color:'\\x23666', fontSize:'13px', marginBottom:'16px'}}, 'Settings → SOTA Magic to customize colors, units, and more.'),
+                    wp.element.createElement('p', {style:{color:'\\x23666', fontSize:'13px', marginBottom:'16px'}}, 'Settings → Activator Toolkit for SOTA to customize colors, units, and more.'),
                     wp.element.createElement('div', {style:{textAlign:'left', marginBottom:'16px'}},
                         wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px'}},
                             wp.element.createElement('div', {style:{flex:'1', minWidth:'0'}},
@@ -1043,13 +1088,13 @@ add_action('enqueue_block_editor_assets', function() {
 
                             wp.element.createElement('h3', {style:{margin:'0 0 8px 0', color:'\\x230073aa', fontSize:'14px'}}, '🔧 Why Stats Might Look Wrong'),
                             wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
-                                wp.element.createElement('strong', null, 'Activation time is 0 or missing'), ' — The plugin could not locate the activation zone. Check that your CSV file includes a valid summit reference. Turn on Debug Mode in Settings → SOTA Magic for details.'
+                                wp.element.createElement('strong', null, 'Activation time is 0 or missing'), ' — The plugin could not locate the activation zone. Check that your CSV file includes a valid summit reference. Turn on Debug Mode in Settings → Activator Toolkit for SOTA for details.'
                             ),
                             wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
                                 wp.element.createElement('strong', null, 'Zone looks wrong on the map'), ' — Look for a red polygon (API-based) or orange circle (radius fallback) on the map. If you see a circle, the API did not return a zone. Try increasing the radius in Settings, or use the Statistics Override below to force a specific value.'
                             ),
                             wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
-                                wp.element.createElement('strong', null, 'Hiking time seems too high'), ' — Rest breaks are included in hiking time. Adjust the rest break threshold in Settings → SOTA Magic.'
+                                wp.element.createElement('strong', null, 'Hiking time seems too high'), ' — Rest breaks are included in hiking time. Adjust the rest break threshold in Settings → Activator Toolkit for SOTA.'
                             ),
                             wp.element.createElement('p', {style:{margin:'0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
                                 wp.element.createElement('strong', null, 'GPS track does not reach the summit'), ' — The zone is centred on the highest point in your track. If you stopped before the peak, use the Activation Zone radius override below or manually enter the activation time.'
@@ -1343,7 +1388,7 @@ function sota_magic_render_sota_data($atts) {
     $map_iframe_url = '';
     if ($show_map && $csv_url) {
         $sota_magic_debug_param = (get_option('sota_debug_mode_public') || (get_option('sota_debug_mode') && current_user_can('manage_options'))) ? '&debug=1' : '';
-        $map_iframe_url = plugins_url('contact-map.php', __FILE__) . '?csv=' . urlencode($csv_url) . '&_nonce=' . wp_create_nonce('sota_magic_contact_map') . $sota_magic_debug_param;
+        $map_iframe_url = admin_url('admin-ajax.php') . '?action=sota_magic_contact_map&csv=' . urlencode($csv_url) . '&_nonce=' . wp_create_nonce('sota_magic_contact_map') . $sota_magic_debug_param;
     }
 
     // Unique map ID for this block (static counter survives multiple blocks on one page)
@@ -1355,8 +1400,8 @@ function sota_magic_render_sota_data($atts) {
     if ($gpx_url && !empty($track_points)) {
         wp_enqueue_style('sota-leaflet', plugins_url('lib/leaflet.css', __FILE__), [], '1.9.4');
         wp_enqueue_script('sota-leaflet-js', plugins_url('lib/leaflet.js', __FILE__), [], '1.9.4', true);
-        wp_enqueue_script('sota-chartjs', plugins_url('lib/chart.umd.min.js', __FILE__), [], '4.4.0', true);
-        wp_enqueue_script('sota-magic-map', plugins_url('sota-magic-map.js', __FILE__), ['sota-leaflet-js', 'sota-chartjs'], '1.1.0', true);
+        wp_enqueue_script('sota-chartjs', plugins_url('lib/chart.umd.min.js', __FILE__), [], '4.5.1', true);
+        wp_enqueue_script('activator-toolkit-map', plugins_url('activator-toolkit-map.js', __FILE__), ['sota-leaflet-js', 'sota-chartjs'], '1.1.0', true);
 
         // Build activation zone payload
         $az_data = null;
@@ -1394,279 +1439,20 @@ function sota_magic_render_sota_data($atts) {
             'defaultLayer'   => get_option('sota_default_map_layer', 'topo'),
         ];
 
-        wp_add_inline_script('sota-magic-map',
+        wp_add_inline_script('activator-toolkit-map',
             'sotaMagicInitMap(' . wp_json_encode($map_id) . ', ' . wp_json_encode($map_data) . ');'
         );
+
+        // Modal escape-key handler — added once per page even with multiple blocks
+        static $modal_script_added = false;
+        if ( ! $modal_script_added ) {
+            wp_add_inline_script( 'activator-toolkit-map', '(function(){document.addEventListener("keydown",function(e){if(e.key==="Escape"){var m=document.getElementById("sota-stats-modal");if(m)m.classList.remove("sota-modal-open");}});})();' );
+            $modal_script_added = true;
+        }
     }
 
     ob_start();
     ?>
-    <style>
-        .sota-main-container {
-            background: <?php echo esc_attr($bg); ?>;
-            color: <?php echo esc_attr($text); ?>;
-            font-family: <?php echo esc_attr($font); ?>;
-            padding: 30px;
-            border-radius: 12px;
-            margin: 40px 0;
-            <?php if (!get_option('sota_is_transparent')): ?>
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            <?php endif; ?>
-        }
-        .sota-main-container h3 {
-            color: <?php echo esc_attr($text); ?>;
-            border-bottom: 1px solid <?php echo esc_attr($text); ?>44;
-            padding-bottom: 10px;
-        }
-
-        /* GPX Statistics Grid */
-        .sota-gpx-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin: 0 0 20px 0;
-            padding: 20px;
-            background: <?php echo $bg === 'transparent' ? 'rgba(255,255,255,0.05)' : (esc_attr($bg) . '22'); ?>;
-            border-radius: 8px;
-            border: 1px solid <?php echo esc_attr($text); ?>22;
-        }
-
-        .sota-stat-box {
-            text-align: center;
-            padding: 15px;
-            background: <?php echo $bg === 'transparent' ? 'rgba(255,255,255,0.1)' : '#fff'; ?>;
-            border-radius: 6px;
-            <?php if ($bg !== 'transparent'): ?>
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            <?php endif; ?>
-        }
-
-        .sota-stat-icon {
-            font-size: 28px;
-            margin-bottom: 8px;
-        }
-
-        .sota-stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: <?php echo esc_attr($text); ?>;
-            margin-bottom: 5px;
-        }
-
-        .sota-stat-label {
-            font-size: 13px;
-            color: <?php echo esc_attr($text); ?>99;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .sota-stat-secondary {
-            font-size: 12px;
-            color: <?php echo esc_attr($text); ?>77;
-            margin-top: 5px;
-        }
-
-        /* Responsive table wrapper */
-        .sota-table-wrapper {
-            overflow-x: auto;
-            overflow-y: visible;
-            -webkit-overflow-scrolling: touch;
-            margin: 20px 0;
-        }
-        .sota-table {
-            width: 100%;
-            border-collapse: collapse;
-            color: <?php echo esc_attr($text); ?>;
-            min-width: 800px; /* Ensures table doesn't get too cramped */
-        }
-        .sota-table th {
-            border-bottom: 2px solid <?php echo esc_attr($text); ?>66;
-            padding: 12px;
-            text-align: left;
-            white-space: nowrap;
-        }
-        .sota-table td {
-            padding: 10px;
-            border-bottom: 1px solid <?php echo esc_attr($text); ?>22;
-            vertical-align: top;
-        }
-        /* Allow comments column to wrap text */
-        .sota-table td:last-child {
-            white-space: normal;
-            word-wrap: break-word;
-            max-width: 300px;
-        }
-        .s2s-row td {
-            background: <?php echo esc_attr($s2s_bg); ?> !important;
-            color: <?php echo esc_attr($s2s_text); ?> !important;
-            font-weight: bold;
-        }
-        .s2s-badge {
-            background: <?php echo esc_attr($s2s_text); ?>;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.75em;
-            margin-left: 5px;
-        }
-        /* GPX map + elevation chart */
-        .sota-gpx-map {
-            width: 100%;
-            height: 400px;
-            border-radius: 8px 8px 0 0;
-            background: #e8e8e8;
-        }
-        .sota-gpx-chart-wrap {
-            width: 100%;
-            height: 140px;
-            margin-bottom: 16px;
-            background: #fff;
-            border: 1px solid #ddd;
-            border-top: none;
-            border-radius: 0 0 8px 8px;
-            position: relative;
-            padding: 4px 4px 8px 4px;
-            box-sizing: border-box;
-        }
-        /* Stats help modal */
-        .sota-modal-backdrop {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.55);
-            z-index: 99999;
-            justify-content: center;
-            align-items: flex-start;
-            padding: 40px 16px;
-        }
-        .sota-modal-backdrop.sota-modal-open {
-            display: flex;
-        }
-        .sota-modal {
-            background: #ffffff;
-            color: #1e1e1e;
-            border-radius: 12px;
-            padding: 30px 32px;
-            max-width: 680px;
-            width: 100%;
-            max-height: 85vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
-            position: relative;
-            font-family: sans-serif;
-        }
-        .sota-modal h2 {
-            margin: 0 0 6px 0;
-            font-size: 20px;
-            color: #0073aa;
-            border: none;
-            padding: 0;
-        }
-        .sota-modal .sota-modal-subtitle {
-            font-size: 13px;
-            color: #666;
-            margin: 0 0 22px 0;
-        }
-        .sota-modal-close {
-            position: absolute;
-            top: 16px;
-            right: 20px;
-            background: none;
-            border: none;
-            font-size: 22px;
-            cursor: pointer;
-            color: #888;
-            line-height: 1;
-            padding: 0;
-        }
-        .sota-modal-close:hover { color: #333; }
-        .sota-modal-section {
-            border-top: 1px solid #eeeeee;
-            padding: 14px 0;
-        }
-        .sota-modal-section:first-of-type { border-top: none; padding-top: 0; }
-        .sota-modal-section h3 {
-            margin: 0 0 6px 0;
-            font-size: 15px;
-            color: #1e1e1e;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: none;
-            padding: 0;
-        }
-        .sota-modal-section p {
-            margin: 0;
-            font-size: 13px;
-            color: #444;
-            line-height: 1.65;
-        }
-        .sota-modal-section p + p { margin-top: 6px; }
-        .sota-modal-note {
-            margin-top: 20px;
-            padding: 12px 14px;
-            background: #f0f7ff;
-            border-left: 3px solid #0073aa;
-            border-radius: 4px;
-            font-size: 12px;
-            color: #444;
-            line-height: 1.6;
-        }
-        .sota-help-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            background: none;
-            border: 1px solid currentColor;
-            border-radius: 20px;
-            padding: 3px 11px;
-            font-size: 12px;
-            cursor: pointer;
-            opacity: 0.65;
-            color: inherit;
-            font-family: sans-serif;
-            vertical-align: middle;
-        }
-        .sota-help-btn:hover { opacity: 1; }
-        .sota-stats-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin: 12px 0 8px 0;
-        }
-        .sota-stats-header-label {
-            font-size: 13px;
-            font-weight: 600;
-            opacity: 0.7;
-            letter-spacing: 0.03em;
-            text-transform: uppercase;
-        }
-        /* Mobile responsiveness */
-        @media screen and (max-width: 768px) {
-            .sota-main-container {
-                padding: 15px;
-            }
-            .sota-gpx-stats {
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 15px;
-                padding: 15px;
-            }
-            .sota-stat-icon {
-                font-size: 24px;
-            }
-            .sota-stat-value {
-                font-size: 20px;
-            }
-            .sota-table {
-                font-size: 14px;
-            }
-            .sota-table th,
-            .sota-table td {
-                padding: 8px;
-            }
-        }
-    </style>
-
     <div class="sota-main-container">
         <?php if ($gpx_url): ?>
             <h3>🏔️ <?php echo esc_html(get_option('sota_headline_gpx')); ?></h3>
@@ -1749,7 +1535,7 @@ function sota_magic_render_sota_data($atts) {
                         This uses Digital Elevation Model (DEM) data and the official SOTA 25m vertical drop rule for maximum accuracy.
                     <?php else: ?>
                         Using radius approximation method (<?php echo esc_html((string) $gpx_stats['activation_zone_radius']); ?>m from highest GPS point).
-                        For more accuracy, enable the activation.zone API in Settings → SOTA Magic, or ensure your CSV file includes the summit reference.
+                        For more accuracy, enable the activation.zone API in Settings → Activator Toolkit for SOTA, or ensure your CSV file includes the summit reference.
                     <?php endif; ?>
                 </div>
                 
@@ -1802,25 +1588,16 @@ function sota_magic_render_sota_data($atts) {
                             <p><strong>API-based zone (currently active):</strong> The boundary is retrieved from <a href="https://activation.zone" target="_blank" style="color:#0073aa;">activation.zone</a> using Digital Elevation Model (DEM) terrain data and the official SOTA rule — the zone extends to where the terrain drops 25 metres below the summit. This is the most accurate method and matches what SOTA adjudicators use.</p>
                             <?php else: ?>
                             <p><strong>Radius method (currently active):</strong> The activation zone is approximated as a circle of <strong><?php echo esc_html((string) $gpx_stats['activation_zone_radius']); ?> metres</strong> around the highest GPS point. This is less precise than the API method because it ignores terrain shape, but works without an internet lookup or summit reference in the log.</p>
-                            <p>For better accuracy, enable the activation.zone API in <em>Settings → SOTA Magic</em> and ensure your CSV log includes the summit reference.</p>
+                            <p>For better accuracy, enable the activation.zone API in <em>Settings → Activator Toolkit for SOTA</em> and ensure your CSV log includes the summit reference.</p>
                             <?php endif; ?>
                         </div>
 
                         <div class="sota-modal-note">
-                            ⚙️ The stationary speed threshold, rest break minimum duration, activation zone radius, and unit system (metric/imperial) can all be tuned in <strong>Settings → SOTA Magic</strong>. If any values look wrong, the Manual Overrides on the SOTAMAGIC block let you correct individual figures without re-uploading files.
+                            ⚙️ The stationary speed threshold, rest break minimum duration, activation zone radius, and unit system (metric/imperial) can all be tuned in <strong>Settings → Activator Toolkit for SOTA</strong>. If any values look wrong, the Manual Overrides on the Activator Toolkit block let you correct individual figures without re-uploading files.
                         </div>
                     </div>
                 </div>
-                <script>
-                (function() {
-                    document.addEventListener('keydown', function(e) {
-                        if (e.key === 'Escape') {
-                            var m = document.getElementById('sota-stats-modal');
-                            if (m) m.classList.remove('sota-modal-open');
-                        }
-                    });
-                })();
-                </script>
+
 
                 <!-- Debug info -->
                 <?php if (get_option('sota_debug_mode_public') || (get_option('sota_debug_mode') && current_user_can('manage_options'))): ?>

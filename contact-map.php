@@ -4,14 +4,7 @@
  * Version: 1.4
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-    require_once dirname( __FILE__ ) . '/../../../wp-load.php';
-}
-
-// Verify nonce
-if ( ! isset( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_nonce'] ) ), 'sota_magic_contact_map' ) ) {
-    wp_die( 'Invalid request.' );
-}
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly — served via admin-ajax.php
 
 /**
  * Look up a cached location row from the dedicated locations table.
@@ -20,7 +13,7 @@ if ( ! isset( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_un
 function sota_magic_location_read( $cache_key ) {
     global $wpdb;
     $table = $wpdb->prefix . 'sota_magic_locations';
-    return $wpdb->get_row( $wpdb->prepare(
+    return $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional custom cache table; no WP object cache equivalent
         "SELECT lat, lon, label, source FROM $table
          WHERE cache_key = %s
            AND (expires_at IS NULL OR expires_at > NOW())
@@ -36,7 +29,7 @@ function sota_magic_location_read( $cache_key ) {
 function sota_magic_location_write( $cache_key, $lat, $lon, $label, $source, $expires_seconds = 0 ) {
     global $wpdb;
     $table = $wpdb->prefix . 'sota_magic_locations';
-    $wpdb->replace( $table, [
+    $wpdb->replace( $table, [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional custom cache table; no WP object cache equivalent
         'cache_key'  => $cache_key,
         'lat'        => $lat,
         'lon'        => $lon,
@@ -47,9 +40,9 @@ function sota_magic_location_write( $cache_key, $lat, $lon, $label, $source, $ex
     ] );
 }
 
-// Get and sanitize parameters
-$sota_magic_debug_mode = ( isset( $_GET['debug'] ) && $_GET['debug'] === '1' );
-$sota_magic_csv_url = isset( $_GET['csv'] ) ? esc_url_raw( wp_unslash( $_GET['csv'] ) ) : '';
+// Get and sanitize parameters — nonce already verified by the AJAX handler in activator-toolkit-for-sota.php
+$sota_magic_debug_mode = ( isset( $_GET['debug'] ) && $_GET['debug'] === '1' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nonce verified in AJAX handler
+$sota_magic_csv_url = isset( $_GET['csv'] ) ? esc_url_raw( wp_unslash( $_GET['csv'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nonce verified in AJAX handler
 if ( ! $sota_magic_csv_url ) {
     echo '<div style="padding:20px;">No CSV file specified</div>';
     exit;
@@ -79,6 +72,21 @@ if ( ! is_wp_error( $sota_magic_csv_response ) ) {
             ];
         }
     }
+}
+
+/**
+ * Calculate great-circle distance between two lat/lon points (Haversine formula).
+ * Returns array with 'km' and 'miles', both rounded to 1 decimal place.
+ */
+function sota_magic_haversine( $lat1, $lon1, $lat2, $lon2 ) {
+    $R     = 6371;
+    $dLat  = deg2rad( $lat2 - $lat1 );
+    $dLon  = deg2rad( $lon2 - $lon1 );
+    $a     = sin( $dLat / 2 ) * sin( $dLat / 2 )
+           + cos( deg2rad( $lat1 ) ) * cos( deg2rad( $lat2 ) )
+           * sin( $dLon / 2 ) * sin( $dLon / 2 );
+    $km    = $R * 2 * atan2( sqrt( $a ), sqrt( 1 - $a ) );
+    return [ 'km' => round( $km, 1 ), 'miles' => round( $km * 0.621371, 1 ) ];
 }
 
 /**
@@ -149,8 +157,8 @@ if ( ! empty( $sota_magic_contacts[0]['my_summit'] ) ) {
         ];
     } else {
         $sota_magic_api_url  = 'https://api2.sota.org.uk/api/summits/' . $sota_magic_summit_ref;
-        $sota_magic_context  = stream_context_create( [ 'http' => [ 'timeout' => 30, 'user_agent' => 'SOTA-Magic-Plugin/1.0' ] ] );
-        $sota_magic_response = @file_get_contents( $sota_magic_api_url, false, $sota_magic_context ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+        $sota_magic_wp_resp  = wp_remote_get( $sota_magic_api_url, [ 'timeout' => 30, 'user-agent' => 'SOTA-Magic-Plugin/1.0' ] );
+        $sota_magic_response = ! is_wp_error( $sota_magic_wp_resp ) ? wp_remote_retrieve_body( $sota_magic_wp_resp ) : false;
         if ( $sota_magic_response !== false ) {
             $sota_magic_summit_data = json_decode( $sota_magic_response, true );
             if ( $sota_magic_summit_data && isset( $sota_magic_summit_data['latitude'], $sota_magic_summit_data['longitude'] ) ) {
@@ -171,7 +179,8 @@ if ( ! empty( $sota_magic_contacts[0]['my_summit'] ) ) {
 $sota_magic_qrz_session = null;
 if ( $sota_magic_qrz_user && $sota_magic_qrz_pass ) {
     $sota_magic_login_url      = 'https://xmldata.qrz.com/xml/current/?username=' . rawurlencode( $sota_magic_qrz_user ) . '&password=' . rawurlencode( $sota_magic_qrz_pass );
-    $sota_magic_login_response = @file_get_contents( $sota_magic_login_url ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+    $sota_magic_login_wp       = wp_remote_get( $sota_magic_login_url, [ 'timeout' => 15 ] );
+    $sota_magic_login_response = ! is_wp_error( $sota_magic_login_wp ) ? wp_remote_retrieve_body( $sota_magic_login_wp ) : false;
     if ( $sota_magic_login_response ) {
         preg_match( '/<Key>([^<]+)<\/Key>/', $sota_magic_login_response, $sota_magic_matches );
         if ( ! empty( $sota_magic_matches[1] ) ) {
@@ -229,8 +238,8 @@ foreach ( $sota_magic_contacts as $sota_magic_contact ) {
             ];
         } else {
             $sota_magic_their_api_url  = 'https://api2.sota.org.uk/api/summits/' . $sota_magic_their_ref;
-            $sota_magic_their_context  = stream_context_create( [ 'http' => [ 'timeout' => 15, 'user_agent' => 'SOTA-Magic-Plugin/1.0' ] ] );
-            $sota_magic_their_response = @file_get_contents( $sota_magic_their_api_url, false, $sota_magic_their_context ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+            $sota_magic_their_wp       = wp_remote_get( $sota_magic_their_api_url, [ 'timeout' => 15, 'user-agent' => 'SOTA-Magic-Plugin/1.0' ] );
+            $sota_magic_their_response = ! is_wp_error( $sota_magic_their_wp ) ? wp_remote_retrieve_body( $sota_magic_their_wp ) : false;
             if ( $sota_magic_their_response !== false ) {
                 $sota_magic_their_data = json_decode( $sota_magic_their_response, true );
                 if ( $sota_magic_their_data && isset( $sota_magic_their_data['latitude'], $sota_magic_their_data['longitude'] ) ) {
@@ -278,8 +287,8 @@ foreach ( $sota_magic_contacts as $sota_magic_contact ) {
             ];
         } else {
             $sota_magic_qrz_url      = 'https://xmldata.qrz.com/xml/current/?s=' . rawurlencode( $sota_magic_qrz_session ) . '&callsign=' . rawurlencode( $sota_magic_callsign );
-            $sota_magic_qrz_context  = stream_context_create( [ 'http' => [ 'timeout' => 15, 'user_agent' => 'SOTA-Magic-Plugin/1.0' ] ] );
-            $sota_magic_qrz_response = @file_get_contents( $sota_magic_qrz_url, false, $sota_magic_qrz_context ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+            $sota_magic_qrz_wp       = wp_remote_get( $sota_magic_qrz_url, [ 'timeout' => 15, 'user-agent' => 'SOTA-Magic-Plugin/1.0' ] );
+            $sota_magic_qrz_response = ! is_wp_error( $sota_magic_qrz_wp ) ? wp_remote_retrieve_body( $sota_magic_qrz_wp ) : false;
             if ( $sota_magic_qrz_response ) {
                 preg_match( '/<lat>([^<]+)<\/lat>/', $sota_magic_qrz_response, $sota_magic_lat_match );
                 preg_match( '/<lon>([^<]+)<\/lon>/', $sota_magic_qrz_response, $sota_magic_lon_match );
@@ -315,55 +324,15 @@ foreach ( $sota_magic_contacts as $sota_magic_contact ) {
     }
 }
 
-// Local Leaflet assets (bundled with plugin — inlined to satisfy WP enqueue rules in standalone page)
-$sota_magic_leaflet_css = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/leaflet.css' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-$sota_magic_leaflet_js  = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/leaflet.js' );  // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 ?>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>SOTA Contact Map</title>
-    <style><?php echo $sota_magic_leaflet_css; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- local bundled CSS file ?></style>
-    <script><?php echo $sota_magic_leaflet_js; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- local bundled JS file ?></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: sans-serif; }
-        #map { width: 100%; height: 100vh; }
-        .popup-content { font-size: 13px; line-height: 1.6; }
-        .popup-content strong { display: block; margin-bottom: 5px; font-size: 15px; color: #333; }
-        .band-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 5px;
-            vertical-align: middle;
-        }
-        #loading-overlay {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: #f5f5f5;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            transition: opacity 0.3s ease;
-        }
-        #loading-overlay.hidden { opacity: 0; pointer-events: none; }
-        .loading-spinner {
-            width: 50px; height: 50px;
-            border: 5px solid #e0e0e0;
-            border-top: 5px solid #0073aa;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .loading-text { margin-top: 20px; font-size: 16px; color: #666; }
-        .loading-icon { font-size: 48px; margin-bottom: 10px; }
-    </style>
+    <link rel="stylesheet" href="<?php echo esc_url( plugins_url( 'lib/leaflet.css', __FILE__ ) ); ?>"> <?php // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- standalone HTML document served via admin-ajax; wp_enqueue_style() is not available ?>
+    <link rel="stylesheet" href="<?php echo esc_url( plugins_url( 'contact-map.css', __FILE__ ) ); ?>"> <?php // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- standalone HTML document ?>
+    <script src="<?php echo esc_url( plugins_url( 'lib/leaflet.js', __FILE__ ) ); ?>"></script> <?php // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- standalone HTML document ?>
 </head>
 <body>
     <div id="loading-overlay">
@@ -408,7 +377,17 @@ $sota_magic_leaflet_js  = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/
             fillOpacity: 0.9
         }).addTo(map);
 
-        contactCircle.bindPopup('<div class="popup-content"><strong><?php echo esc_js( $sota_magic_loc['callsign'] ); ?></strong><?php if ( $sota_magic_loc['summit'] ) : ?><br>\ud83d\udce1 <?php echo esc_js( $sota_magic_loc['summit'] ); ?> <span style="background:#ff9800;color:white;padding:2px 6px;border-radius:3px;font-size:11px;">S2S</span><?php endif; ?><br><span class="band-indicator" style="background-color:<?php echo esc_attr( $sota_magic_loc['color'] ); ?>;"></span><?php echo esc_js( $sota_magic_loc['frequency'] ); ?> MHz - <?php echo esc_js( $sota_magic_loc['mode'] ); ?><?php if ( $sota_magic_loc['location_source'] === 'grid' ) : ?><br><span style="font-size:11px;color:#0073aa;">\ud83d\udccd Grid: <?php echo esc_js( $sota_magic_loc['grid'] ); ?></span><?php elseif ( $sota_magic_loc['location_source'] === 'qrz' ) : ?><br><span style="font-size:11px;color:#888;">\ud83c\udfe0 QRZ home address</span><?php endif; ?></div>');
+        <?php
+        $sota_magic_dist_html = '';
+        if ( $sota_magic_summit ) {
+            $sota_magic_dist = sota_magic_haversine(
+                $sota_magic_summit['lat'], $sota_magic_summit['lon'],
+                $sota_magic_loc['lat'],   $sota_magic_loc['lon']
+            );
+            $sota_magic_dist_html = '<br><span style="font-size:11px;color:#555;">&#128207; ' . esc_js( $sota_magic_dist['miles'] ) . ' mi &nbsp;/&nbsp; ' . esc_js( $sota_magic_dist['km'] ) . ' km</span>';
+        }
+        ?>
+        contactCircle.bindPopup('<div class="popup-content"><strong><?php echo esc_js( $sota_magic_loc['callsign'] ); ?></strong><?php if ( $sota_magic_loc['summit'] ) : ?><br>\ud83d\udce1 <?php echo esc_js( $sota_magic_loc['summit'] ); ?> <span style="background:#ff9800;color:white;padding:2px 6px;border-radius:3px;font-size:11px;">S2S</span><?php endif; ?><br><span class="band-indicator" style="background-color:<?php echo esc_attr( $sota_magic_loc['color'] ); ?>;"></span><?php echo esc_js( $sota_magic_loc['frequency'] ); ?> MHz - <?php echo esc_js( $sota_magic_loc['mode'] ); ?><?php echo $sota_magic_dist_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- pre-escaped above ?><?php if ( $sota_magic_loc['location_source'] === 'grid' ) : ?><br><span style="font-size:11px;color:#0073aa;">\ud83d\udccd Grid: <?php echo esc_js( $sota_magic_loc['grid'] ); ?></span><?php elseif ( $sota_magic_loc['location_source'] === 'qrz' ) : ?><br><span style="font-size:11px;color:#888;">\ud83c\udfe0 QRZ home address</span><?php endif; ?></div>');
 
         <?php if ( $sota_magic_summit ) : ?>
         L.polyline([
@@ -484,15 +463,15 @@ $sota_magic_leaflet_js  = file_get_contents( plugin_dir_path( __FILE__ ) . 'lib/
             else $sota_magic_fresh_count++;
         }
         ?>
-        Cache hits: <strong><?php echo $sota_magic_cached_count; ?></strong> &nbsp;|&nbsp; Fresh lookups: <strong><?php echo $sota_magic_fresh_count; ?></strong> &nbsp;|&nbsp; Unresolved: <strong><?php echo count( $sota_magic_unresolved ); ?></strong><br>
+        Cache hits: <strong><?php echo esc_html( (string) $sota_magic_cached_count ); ?></strong> &nbsp;|&nbsp; Fresh lookups: <strong><?php echo esc_html( (string) $sota_magic_fresh_count ); ?></strong> &nbsp;|&nbsp; Unresolved: <strong><?php echo esc_html( (string) count( $sota_magic_unresolved ) ); ?></strong><br>
         <?php
         global $wpdb;
         $sota_magic_loc_table  = $wpdb->prefix . 'sota_magic_locations';
-        $sota_magic_total_rows = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $sota_magic_loc_table" );
+        $sota_magic_total_rows = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $sota_magic_loc_table" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is derived from trusted $wpdb->prefix; no cache needed for debug output
         $sota_magic_db_error   = $wpdb->last_error;
         ?>
         <hr style="margin:4px 0;">
-        Locations table: <strong><?php echo esc_html( $sota_magic_loc_table ); ?></strong> — <strong><?php echo $sota_magic_total_rows; ?> row(s) stored</strong><br>
+        Locations table: <strong><?php echo esc_html( $sota_magic_loc_table ); ?></strong> — <strong><?php echo esc_html( (string) $sota_magic_total_rows ); ?> row(s) stored</strong><br>
         DB error: <strong><?php echo $sota_magic_db_error ? esc_html( $sota_magic_db_error ) : 'none'; ?></strong><br>
         <hr style="margin:4px 0;">
         <?php foreach ( $sota_magic_contact_locations as $sota_magic_idx => $sota_magic_loc ) : ?>

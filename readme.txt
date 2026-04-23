@@ -1,18 +1,18 @@
-=== SOTA Magic ===
-Contributors: ki6cr
+=== Activator Toolkit for SOTA ===
+Contributors: ki6cr, creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 1.0.3
+Stable tag: 1.0.4
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Display SOTA activation data beautifully — GPX maps, elevation charts, hiking stats, contact tables, and a contact map. No other plugins needed.
+Display your SOTA activation data beautifully — GPX maps, elevation charts, hiking stats, contact tables, and a contact map. No other plugins needed.
 
 == Description ==
 
-SOTA Magic is a WordPress plugin for amateur radio operators participating in Summits On The Air (SOTA). Add the SOTAMAGIC Gutenberg block to any post or page, upload your GPX track and SOTA CSV log, and the plugin automatically generates:
+Activator Toolkit for SOTA is a WordPress plugin for amateur radio operators participating in Summits On The Air (SOTA). Add the Activator Toolkit block to any post or page, upload your GPX track and SOTA CSV log, and the plugin automatically generates:
 
 * An interactive GPX track map with three selectable base layers (Topographic, OpenStreetMap, Minimal)
 * An elevation profile chart with hover-to-map interaction
@@ -21,7 +21,7 @@ SOTA Magic is a WordPress plugin for amateur radio operators participating in Su
 * A contacts table with automatic Summit-to-Summit (S2S) highlighting
 * An interactive contact map showing where your QSOs were located
 
-**No other plugins required.** All map libraries (Leaflet 1.9.4, Chart.js 4.4.0) are bundled with the plugin.
+**No other plugins required.** All map libraries (Leaflet 1.9.4, Chart.js 4.5.1) are bundled with the plugin.
 
 = Features =
 
@@ -37,7 +37,7 @@ SOTA Magic is a WordPress plugin for amateur radio operators participating in Su
 * **S2S Highlighting** — Automatic detection and custom color highlighting for Summit-to-Summit contacts
 * **Interactive Contact Map** — Shows contact locations by band, with lines to the summit; S2S contacts use SOTA API coordinates, regular contacts use QRZ.com lookups
 * **Maidenhead Grid Support** — Contacts with a grid square in the comments field are plotted automatically
-* **Fully Customizable** — Colors, fonts, headlines, and display options in Settings → SOTA Magic
+* **Fully Customizable** — Colors, fonts, headlines, and display options in Settings → Activator Toolkit for SOTA
 * **Block Editor Compatible** — Simple Gutenberg block with file upload and manual override fields
 * **Responsive Design** — Works on mobile and desktop
 
@@ -49,7 +49,7 @@ The plugin uses two methods to determine the activation zone, applied in priorit
 Queries api.activation.zone (by N6ARA) using your summit reference from the CSV file. The API returns a precise polygon based on terrain elevation data and the official SOTA 25m vertical drop rule. All time spent inside this polygon counts as activation time.
 
 **Method 2: Radius Fallback (Automatic)**
-If the API is disabled or unavailable, the plugin draws a configurable circle (default 50m) around the highest GPS point. Configurable in Settings → SOTA Magic (20–200m).
+If the API is disabled or unavailable, the plugin draws a configurable circle (default 50m) around the highest GPS point. Configurable in Settings → Activator Toolkit for SOTA (20–200m).
 
 = CSV Format =
 
@@ -80,8 +80,8 @@ The plugin expects SOTA CSV v2 format:
 
 = After Installation =
 
-1. Go to Settings → SOTA Magic and configure your preferences
-2. In any post or page, add the "SOTAMAGIC" Gutenberg block
+1. Go to Settings → Activator Toolkit for SOTA and configure your preferences
+2. In any post or page, add the "Activator Toolkit" block
 3. Upload your GPX file and/or SOTA CSV file
 4. Publish or preview — your activation data appears automatically
 
@@ -117,23 +117,23 @@ Yes. If a 4- or 6-character grid square appears anywhere in the contact's Commen
 
 = Can I override the calculated statistics? =
 
-Yes. The SOTAMAGIC block editor panel includes manual override fields for hiking distance, hiking time, activation time, rest breaks, and total time. Check the box next to a field to enable the override.
+Yes. The Activator Toolkit block editor panel includes manual override fields for hiking distance, hiking time, activation time, rest breaks, and total time. Check the box next to a field to enable the override.
 
 = Can I force the radius method instead of the API? =
 
-Yes. In the block editor, check "Activation Zone: Radius-based (API skipped)" in the Manual Overrides panel. Or disable the API globally in Settings → SOTA Magic.
+Yes. In the block editor, check "Activation Zone: Radius-based (API skipped)" in the Manual Overrides panel. Or disable the API globally in Settings → Activator Toolkit for SOTA.
 
 = Can I use multiple blocks on one page? =
 
-Yes. Each SOTAMAGIC block is fully independent. Multiple activations can appear on the same post or page.
+Yes. Each Activator Toolkit block is fully independent. Multiple activations can appear on the same post or page.
 
 = Can I switch between metric and imperial units? =
 
-Yes — Settings → SOTA Magic → Unit System. All statistics and the elevation chart convert automatically.
+Yes — Settings → Activator Toolkit for SOTA → Unit System. All statistics and the elevation chart convert automatically.
 
 = Can I customize the appearance? =
 
-Yes — Settings → SOTA Magic lets you set background color, text color, transparent background, S2S highlight colors, and whether to use your theme's font.
+Yes — Settings → Activator Toolkit for SOTA lets you set background color, text color, transparent background, S2S highlight colors, and whether to use your theme's font.
 
 == Screenshots ==
 
@@ -145,6 +145,15 @@ Yes — Settings → SOTA Magic lets you set background color, text color, trans
 6. Settings page
 
 == Changelog ==
+
+= 1.0.4 =
+* IMPROVED: Plugin renamed to Activator Toolkit for SOTA; all files and references updated from sota-magic to activator-toolkit
+* IMPROVED: All remote HTTP calls replaced with wp_remote_get() / wp_remote_post() (WordPress HTTP API)
+* IMPROVED: All inline styles and scripts replaced with wp_enqueue_style(), wp_add_inline_style(), and wp_add_inline_script()
+* IMPROVED: Contact map served via admin-ajax.php instead of direct file access
+* IMPROVED: Added sanitize callbacks to all register_setting() calls
+* IMPROVED: Chart.js updated from 4.4.0 to 4.5.1
+* FIXED: Added phpcs:ignore comments with explanations for intentional direct DB queries (custom cache table, activation zone polygon cache)
 
 = 1.0.3 =
 * FIXED: Contact map initial zoom now fits all contacts and summit optimally — map waits for container to fully render before fitting bounds

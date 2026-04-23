@@ -1,4 +1,4 @@
-/* sota-magic-map.js — Self-contained GPX map + elevation chart for SOTA Magic
+/* activator-toolkit-map.js — Self-contained GPX map + elevation chart for Activator Toolkit for SOTA
  * No dependency on WP-GPX Maps plugin.
  *
  * Called once per block (from wp_add_inline_script in footer):
