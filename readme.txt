@@ -3,7 +3,7 @@ Contributors: ki6cr, creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 1.0.4
+Stable tag: 1.0.5
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -35,7 +35,7 @@ Activator Toolkit for SOTA is a WordPress plugin for amateur radio operators par
 * **Metric or Imperial Units** — Choose km/m/km/h or mi/ft/mph in settings
 * **Contact Log Tables** — Responsive, horizontally-scrollable tables showing all contacts
 * **S2S Highlighting** — Automatic detection and custom color highlighting for Summit-to-Summit contacts
-* **Interactive Contact Map** — Shows contact locations by band, with lines to the summit; S2S contacts use SOTA API coordinates, regular contacts use QRZ.com lookups
+* **Interactive Contact Map** — Shows contact locations by band, with lines to the summit; contacts with a grid square in Comments are plotted without any external service; S2S contacts use the free SOTA API; all other contacts use QRZ.com XML lookups (requires a QRZ XML subscription)
 * **Maidenhead Grid Support** — Contacts with a grid square in the comments field are plotted automatically
 * **Fully Customizable** — Colors, fonts, headlines, and display options in Settings → Activator Toolkit for SOTA
 * **Block Editor Compatible** — Simple Gutenberg block with file upload and manual override fields
@@ -109,7 +109,9 @@ The plugin automatically falls back to the radius method. Statistics are still c
 
 = Do I need a QRZ subscription? =
 
-Only for the contact map location feature. QRZ XML access is included with QRZ Logbook and XML subscriptions (not the free account). S2S contacts are located via the SOTA API and do not require QRZ.
+Only for the contact map's fallback location lookup. The contact map resolves locations in priority order: (1) Maidenhead grid squares in the Comments field — no QRZ needed; (2) S2S contacts via the free SOTA API — no QRZ needed; (3) all other contacts via the QRZ.com XML API.
+
+QRZ XML access requires a paid QRZ subscription — either the "XML Logbook Data" plan (~$35.95/year) or the Platinum plan. A free QRZ account does not include XML access. Contacts that cannot be located are shown in a "No location found" panel on the map rather than silently dropped.
 
 = Can I use Maidenhead grid squares for contact locations? =
 
@@ -145,6 +147,16 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.0.5 =
+* Fix: Contact map JS moved to external contact-map.js; inline script reduced to a single JSON data assignment (wp_localize_script pattern)
+* Fix: phpcs:ignore annotations added for stylesheet/script tags in standalone AJAX page where wp_enqueue hooks are unavailable
+* Fix: Stable tag updated to match plugin version header
+* Improve: Block name updated to "SOTA Activator Toolkit"
+* Improve: Settings page explains QRZ XML subscription requirement with link to QRZ.com
+* Improve: Settings page explains why QRZ locations are cached permanently (historical accuracy at time of activation)
+* Improve: QRZ cache clear button moved from block editor to Settings page with nuclear-option warning
+* Improve: Plugin logo updated to new 128x128 artwork
 
 = 1.0.4 =
 * IMPROVED: Plugin renamed to Activator Toolkit for SOTA; all files and references updated from sota-magic to activator-toolkit

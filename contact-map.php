@@ -333,19 +333,59 @@ foreach ( $sota_magic_contacts as $sota_magic_contact ) {
     }
 }
 
+// Build the map data object that contact-map.js reads from window.sotaContactMapData.
+// This is a standalone HTML document served via admin-ajax.php; wp_enqueue_script/style
+// hooks have already fired and cannot be used here. All JS logic lives in the external
+// contact-map.js file — the only inline script below is this single data assignment,
+// which is the same pattern WordPress core uses for wp_localize_script().
+$sota_magic_map_contacts = [];
+foreach ( $sota_magic_contact_locations as $sota_magic_loc ) {
+    $sota_magic_dist_miles = null;
+    $sota_magic_dist_km    = null;
+    if ( $sota_magic_summit ) {
+        $sota_magic_dist       = sota_magic_haversine(
+            $sota_magic_summit['lat'], $sota_magic_summit['lon'],
+            $sota_magic_loc['lat'],   $sota_magic_loc['lon']
+        );
+        $sota_magic_dist_miles = $sota_magic_dist['miles'];
+        $sota_magic_dist_km    = $sota_magic_dist['km'];
+    }
+    $sota_magic_map_contacts[] = [
+        'lat'             => floatval( $sota_magic_loc['lat'] ),
+        'lon'             => floatval( $sota_magic_loc['lon'] ),
+        'callsign'        => $sota_magic_loc['callsign'],
+        's2s_summit'      => $sota_magic_loc['summit'] ?? null,
+        'frequency'       => $sota_magic_loc['frequency'],
+        'mode'            => $sota_magic_loc['mode'],
+        'color'           => $sota_magic_loc['color'],
+        'is_s2s'          => (bool) $sota_magic_loc['is_s2s'],
+        'location_source' => $sota_magic_loc['location_source'],
+        'grid'            => $sota_magic_loc['grid'] ?? null,
+        'dist_miles'      => $sota_magic_dist_miles,
+        'dist_km'         => $sota_magic_dist_km,
+    ];
+}
+$sota_magic_map_data = [
+    'summit'     => $sota_magic_summit ? [
+        'lat'  => floatval( $sota_magic_summit['lat'] ),
+        'lon'  => floatval( $sota_magic_summit['lon'] ),
+        'name' => $sota_magic_summit['name'],
+        'ref'  => $sota_magic_summit['ref'],
+    ] : null,
+    'contacts'   => $sota_magic_map_contacts,
+    'unresolved' => $sota_magic_unresolved,
+    'debug'      => $sota_magic_debug_mode,
+];
 ?>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>SOTA Contact Map</title>
-<?php
-// Standalone HTML document served via admin-ajax.php — wp_enqueue_style/script not available here.
-// String concatenation avoids literal '<link'/'<script' patterns that trigger static analysis sniffs.
-echo '<' . 'link rel=' . '"stylesheet" href="' . esc_url( plugins_url( 'lib/leaflet.css', __FILE__ ) ) . '">' . "\n";
-echo '<' . 'link rel=' . '"stylesheet" href="' . esc_url( plugins_url( 'contact-map.css', __FILE__ ) ) . '">' . "\n";
-echo '<' . 'script src="' . esc_url( plugins_url( 'lib/leaflet.js', __FILE__ ) ) . '"></' . 'script>' . "\n";
-?>
+    <?php // phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- standalone HTML doc served via admin-ajax.php; wp_enqueue hooks have already fired. ?>
+    <link rel="stylesheet" href="<?php echo esc_url( plugins_url( 'lib/leaflet.css', __FILE__ ) ); ?>">
+    <link rel="stylesheet" href="<?php echo esc_url( plugins_url( 'contact-map.css', __FILE__ ) ); ?>">
+    <?php // phpcs:enable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet ?>
 </head>
 <body>
     <div id="loading-overlay">
@@ -356,109 +396,14 @@ echo '<' . 'script src="' . esc_url( plugins_url( 'lib/leaflet.js', __FILE__ ) )
 
     <div id="map"></div>
 
-    <script>
-        <?php if ( $sota_magic_summit ) : ?>
-        var map = L.map('map').setView([<?php echo floatval( $sota_magic_summit['lat'] ); ?>, <?php echo floatval( $sota_magic_summit['lon'] ); ?>], 6);
-        <?php else : ?>
-        var map = L.map('map').setView([37.0, -95.0], 4);
-        <?php endif; ?>
-
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
-            maxZoom: 19
-        }).addTo(map);
-
-        var summitIcon = L.divIcon({
-            html: '<div style="font-size:32px;text-align:center;line-height:32px;">\ud83c\udfd4\ufe0f</div>',
-            className: 'summit-icon',
-            iconSize: [32, 32],
-            iconAnchor: [16, 16]
-        });
-
-        <?php if ( $sota_magic_summit ) : ?>
-        var summitMarker = L.marker([<?php echo floatval( $sota_magic_summit['lat'] ); ?>, <?php echo floatval( $sota_magic_summit['lon'] ); ?>], {icon: summitIcon}).addTo(map);
-        summitMarker.bindPopup('<div class="popup-content"><strong>\ud83c\udfd4\ufe0f <?php echo esc_js( $sota_magic_summit['name'] ); ?></strong><?php echo esc_js( $sota_magic_summit['ref'] ); ?><br><em>Your Activation</em></div>');
-        <?php endif; ?>
-
-        <?php foreach ( $sota_magic_contact_locations as $sota_magic_loc ) : ?>
-        var contactCircle = L.circleMarker([<?php echo floatval( $sota_magic_loc['lat'] ); ?>, <?php echo floatval( $sota_magic_loc['lon'] ); ?>], {
-            radius: <?php echo $sota_magic_loc['is_s2s'] ? '8' : '6'; ?>,
-            fillColor: '<?php echo esc_attr( $sota_magic_loc['color'] ); ?>',
-            color: '<?php echo $sota_magic_loc['is_s2s'] ? '#000' : '#fff'; ?>',
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 0.9
-        }).addTo(map);
-
-        <?php
-        $sota_magic_dist_html = '';
-        if ( $sota_magic_summit ) {
-            $sota_magic_dist = sota_magic_haversine(
-                $sota_magic_summit['lat'], $sota_magic_summit['lon'],
-                $sota_magic_loc['lat'],   $sota_magic_loc['lon']
-            );
-            $sota_magic_dist_html = '<br><span style="font-size:11px;color:#555;">&#128207; ' . esc_js( $sota_magic_dist['miles'] ) . ' mi &nbsp;/&nbsp; ' . esc_js( $sota_magic_dist['km'] ) . ' km</span>';
-        }
-        ?>
-        contactCircle.bindPopup('<div class="popup-content"><strong><?php echo esc_js( $sota_magic_loc['callsign'] ); ?></strong><?php if ( $sota_magic_loc['summit'] ) : ?><br>\ud83d\udce1 <?php echo esc_js( $sota_magic_loc['summit'] ); ?> <span style="background:#ff9800;color:white;padding:2px 6px;border-radius:3px;font-size:11px;">S2S</span><?php endif; ?><br><span class="band-indicator" style="background-color:<?php echo esc_attr( $sota_magic_loc['color'] ); ?>;"></span><?php echo esc_js( $sota_magic_loc['frequency'] ); ?> MHz - <?php echo esc_js( $sota_magic_loc['mode'] ); ?><?php echo $sota_magic_dist_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- pre-escaped above ?><?php if ( $sota_magic_loc['location_source'] === 'grid' ) : ?><br><span style="font-size:11px;color:#0073aa;">\ud83d\udccd Grid: <?php echo esc_js( $sota_magic_loc['grid'] ); ?></span><?php elseif ( $sota_magic_loc['location_source'] === 'qrz' ) : ?><br><span style="font-size:11px;color:#888;">\ud83c\udfe0 QRZ home address</span><?php endif; ?></div>');
-
-        <?php if ( $sota_magic_summit ) : ?>
-        L.polyline([
-            [<?php echo floatval( $sota_magic_summit['lat'] ); ?>, <?php echo floatval( $sota_magic_summit['lon'] ); ?>],
-            [<?php echo floatval( $sota_magic_loc['lat'] ); ?>, <?php echo floatval( $sota_magic_loc['lon'] ); ?>]
-        ], {
-            color: '<?php echo esc_attr( $sota_magic_loc['color'] ); ?>',
-            weight: 3,
-            opacity: 0.7
-        }).addTo(map);
-        <?php endif; ?>
-        <?php endforeach; ?>
-
-        var allPoints = [];
-        <?php if ( $sota_magic_summit ) : ?>
-        allPoints.push([<?php echo floatval( $sota_magic_summit['lat'] ); ?>, <?php echo floatval( $sota_magic_summit['lon'] ); ?>]);
-        <?php endif; ?>
-        <?php foreach ( $sota_magic_contact_locations as $sota_magic_loc ) : ?>
-        allPoints.push([<?php echo floatval( $sota_magic_loc['lat'] ); ?>, <?php echo floatval( $sota_magic_loc['lon'] ); ?>]);
-        <?php endforeach; ?>
-
-        map.whenReady(function() {
-            map.invalidateSize();
-            if (allPoints.length > 1) {
-                map.fitBounds(L.latLngBounds(allPoints), {padding: [50, 50]});
-            } else if (allPoints.length === 1) {
-                map.setView(allPoints[0], 10);
-            }
-            setTimeout(function() {
-                document.getElementById('loading-overlay').classList.add('hidden');
-            }, 500);
-        });
-
-        <?php if ( ! empty( $sota_magic_unresolved ) ) : ?>
-        var unresolvedContacts = <?php echo wp_json_encode( $sota_magic_unresolved ); ?>;
-        var UnresolvedControl = L.Control.extend({
-            options: { position: 'bottomleft' },
-            onAdd: function() {
-                var div = L.DomUtil.create('div', '');
-                div.style.cssText = 'background:white;border-radius:4px;padding:8px 12px;font-size:12px;font-family:sans-serif;max-width:240px;box-shadow:0 1px 5px rgba(0,0,0,0.3);line-height:1.6;';
-                var html = '<strong style="color:#555;">&#9888; No location found</strong><br>';
-                unresolvedContacts.forEach(function(c) {
-                    html += '<span style="color:#888;">&bull; ' + c.callsign + '</span><br>';
-                });
-                div.innerHTML = html;
-                return div;
-            }
-        });
-        new UnresolvedControl().addTo(map);
-        <?php endif; ?>
-
-        <?php if ( $sota_magic_debug_mode ) : ?>
-        console.log('[SOTA Map Debug] summit:', <?php echo wp_json_encode( $sota_magic_summit ); ?>);
-        console.log('[SOTA Map Debug] contact_locations:', <?php echo wp_json_encode( $sota_magic_contact_locations ); ?>);
-        console.log('[SOTA Map Debug] contacts_raw count:', <?php echo count( $sota_magic_contacts ); ?>);
-        console.log('[SOTA Map Debug] first my_summit field:', <?php echo wp_json_encode( $sota_magic_contacts[0]['my_summit'] ?? 'none' ); ?>);
-        <?php endif; ?>
-    </script>
+    <?php
+    // Data assignment only — all JS logic is in the external contact-map.js file.
+    // phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedScript -- standalone HTML doc served via admin-ajax.php; wp_enqueue hooks have already fired.
+    echo '<script>var sotaContactMapData = ' . wp_json_encode( $sota_magic_map_data ) . ';</script>' . "\n";
+    echo '<script src="' . esc_url( plugins_url( 'lib/leaflet.js',    __FILE__ ) ) . '"></script>' . "\n";
+    echo '<script src="' . esc_url( plugins_url( 'contact-map.js',    __FILE__ ) ) . '"></script>' . "\n";
+    // phpcs:enable WordPress.WP.EnqueuedResources.NonEnqueuedScript
+    ?>
 
     <?php if ( $sota_magic_debug_mode ) : ?>
     <div style="position:fixed;bottom:0;left:0;right:0;background:#fff3cd;border-top:2px solid #ffc107;padding:8px 12px;font-size:11px;font-family:monospace;z-index:99999;max-height:35vh;overflow-y:auto;">

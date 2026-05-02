@@ -3,7 +3,7 @@
  * Plugin Name: Activator Toolkit for SOTA
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
- * Version: 1.0.4
+ * Version: 1.0.5
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
@@ -173,7 +173,7 @@ function sota_magic_settings_page() {
     }
     ?>
     <div class="wrap">
-        <h1><img src="<?php echo esc_url(plugins_url('lib/activator-toolkit-logo-40.png', __FILE__)); ?>" alt="Activator Toolkit for SOTA" style="height:40px;vertical-align:middle;margin-right:10px;">Activator Toolkit for SOTA Settings</h1>
+        <h1><img src="<?php echo esc_url(plugins_url('lib/activator-toolkit-logo-128.png', __FILE__)); ?>" alt="Activator Toolkit for SOTA" style="height:48px;vertical-align:middle;margin-right:10px;">Activator Toolkit for SOTA Settings</h1>
         <?php
         $sota_magic_data = get_plugin_data( __FILE__ );
         ?>
@@ -231,14 +231,27 @@ function sota_magic_settings_page() {
                 
                 <tr><th colspan="2"><h2>Contact Map</h2></th></tr>
                 <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
-                    <strong>How Contact Locations are Determined:</strong><br>
-                    • <strong>Summit-to-Summit (S2S) contacts:</strong> Exact summit coordinates from SOTA API<br>
-                    • <strong>Regular contacts:</strong> Station location from QRZ.com database (requires QRZ credentials below)<br>
-                    • Locations are looked up once when the map loads and cached for performance
+                    <strong>How Contact Locations are Determined (in priority order):</strong><br>
+                    • <strong>Grid square in Comments field:</strong> Plotted directly from Maidenhead grid — no QRZ needed<br>
+                    • <strong>Summit-to-Summit (S2S) contacts:</strong> Exact summit coordinates from the free SOTA API — no QRZ needed<br>
+                    • <strong>All other contacts:</strong> Station location looked up via QRZ.com XML API (requires a QRZ XML subscription — see below)<br>
+                    • Contacts that cannot be located are listed in a "No location found" panel on the map<br>
+                    • Locations are cached after the first lookup for performance
                 </p></th></tr>
                 <tr><th>Show Contact Map</th><td><input type="checkbox" name="sota_show_contact_map" value="1" <?php checked(1, get_option('sota_show_contact_map')); ?> /></td></tr>
-                <tr><th>QRZ Username</th><td><input type="text" name="sota_qrz_username" value="<?php echo esc_attr(get_option('sota_qrz_username')); ?>" class="regular-text" /><br><small>Your QRZ.com callsign</small></td></tr>
+                <tr><th>QRZ Username</th><td><input type="text" name="sota_qrz_username" value="<?php echo esc_attr(get_option('sota_qrz_username')); ?>" class="regular-text" /><br><small>Your QRZ.com callsign. <strong>Requires a QRZ XML subscription</strong> — a free QRZ account does not include XML access. <a href="https://www.qrz.com/page/xml_data.html" target="_blank">Learn more at QRZ.com</a>.</small></td></tr>
                 <tr><th>QRZ Password</th><td><input type="password" name="sota_qrz_password" value="" placeholder="<?php echo get_option('sota_qrz_password') ? esc_attr('(saved — leave blank to keep current password)') : ''; ?>" class="regular-text" /><br><small>Your QRZ.com password. Leave blank to keep the current saved password.</small></td></tr>
+                <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
+                    <strong>How QRZ location caching works:</strong><br>
+                    When a contact map loads and a contact's location isn't already stored, the plugin looks it up via the QRZ XML API and saves the result to your database. Subsequent map loads use the cached location instantly — no QRZ API call needed.<br><br>
+                    Locations are cached permanently rather than expiring. This is intentional: a ham's QRZ address at the <em>time of your activation</em> is the historically accurate location for that contact. If a station has since moved, their new address would be geographically misleading on an old activation's map.
+                </p></th></tr>
+                <tr><th>Clear QRZ Location Cache</th><td>
+                    <button type="button" id="sota-clear-cache-btn" class="button button-secondary">Clear All Cached QRZ Locations</button>
+                    <p class="description" style="margin-top:6px;color:#c0392b;"><strong>⚠ Nuclear option:</strong> Wipes all cached QRZ locations for every post site-wide. The next time any contact map loads, every non-grid, non-S2S contact will trigger a fresh QRZ lookup. Only use this if you believe cached locations are incorrect.</p>
+                    <p id="sota-clear-cache-result" style="margin-top:6px;font-weight:bold;display:none;"></p>
+                    <?php wp_add_inline_script( 'jquery', '' ); // ensure jQuery hint — actual script below via wp_add_inline_script ?>
+                </td></tr>
 
                 <tr><th colspan="2"><h2>Developer Tools</h2></th></tr>
                 <tr><th>Debug Mode (admin only)</th><td>
@@ -995,7 +1008,7 @@ add_action('enqueue_block_editor_assets', function() {
     ]);
     wp_add_inline_script('sota-editor-js', "
         wp.blocks.registerBlockType('ki6cr/sota-data', {
-            title: 'Activator Toolkit',
+            title: 'SOTA Activator Toolkit',
             icon: 'location-alt',
             category: 'common',
             attributes: {
@@ -1021,7 +1034,7 @@ add_action('enqueue_block_editor_assets', function() {
                 return wp.element.createElement('div', {
                     style:{padding:'25px', background:'\\x23f5f5f5', border:'2px dashed \\x230073aa', borderRadius:'8px', textAlign:'center'}
                 },
-                    wp.element.createElement('h3', {style:{margin:'0 0 10px 0', color:'\\x230073aa'}}, '🏔️ Activator Toolkit'),
+                    wp.element.createElement('h3', {style:{margin:'0 0 10px 0', color:'\\x230073aa'}}, '🏔️ SOTA Activator Toolkit'),
                     wp.element.createElement('p', {style:{color:'\\x23d32f2f', fontWeight:'bold', margin:'0 0 10px 0'}}, '⚠️ Map and table visible in Preview only'),
                     wp.element.createElement('p', {style:{color:'\\x23666', fontSize:'13px', marginBottom:'16px'}}, 'Settings → Activator Toolkit for SOTA to customize colors, units, and more.'),
                     wp.element.createElement('div', {style:{textAlign:'left', marginBottom:'16px'}},
@@ -1261,42 +1274,8 @@ add_action('enqueue_block_editor_assets', function() {
                                         color: props.attributes.overrideTotalTimeEnabled ? '\\x23000000' : '\\x23aaaaaa'}})
                             )
                         ),
-                        // --- QRZ Cache Refresh ---
-                        wp.element.createElement('div', {style:{marginTop:'16px', paddingTop:'12px', borderTop:'1px solid \\x23e0e0e0'}},
-                            wp.element.createElement('p', {style:{fontSize:'11px', color:'\\x23666666', fontFamily:'sans-serif', margin:'0 0 8px'}},
-                                '🗺️ QRZ Location Cache'
-                            ),
-                            wp.element.createElement('button', {
-                                style:{
-                                    width:'100%', padding:'7px 12px', fontSize:'12px', fontFamily:'sans-serif',
-                                    background:'\\x23f0f0f0', border:'1px solid \\x23cccccc', borderRadius:'3px',
-                                    cursor:'pointer', color:'\\x23333333'
-                                },
-                                onClick: function(e) {
-                                    e.preventDefault();
-                                    var btn = e.target;
-                                    btn.disabled = true;
-                                    btn.textContent = 'Clearing...';
-                                    fetch(sotaMagicAdmin.ajaxUrl, {
-                                        method: 'POST',
-                                        headers: {'Content-Type':'application/x-www-form-urlencoded'},
-                                        body: 'action=sota_magic_clear_qrz_cache&_ajax_nonce=' + sotaMagicAdmin.nonce
-                                    })
-                                    .then(function(r){ return r.json(); })
-                                    .then(function(data){
-                                        btn.textContent = data.success ? '✓ ' + data.data : '✗ Error';
-                                        btn.style.background = data.success ? '\\x23d4edda' : '\\x23f8d7da';
-                                        setTimeout(function(){
-                                            btn.textContent = 'Force QRZ Refresh (clear cache)';
-                                            btn.style.background = '\\x23f0f0f0';
-                                            btn.disabled = false;
-                                        }, 4000);
-                                    });
-                                }
-                            }, 'Force QRZ Refresh (clear cache)'),
-                            wp.element.createElement('p', {style:{fontSize:'10px', color:'\\x23999999', fontFamily:'sans-serif', margin:'6px 0 0'}},
-                                'Clears cached QRZ locations for all contacts site-wide. Fresh lookups run on next map load.'
-                            )
+                        wp.element.createElement('p', {style:{fontSize:'11px', color:'\\x23888888', fontFamily:'sans-serif', margin:'16px 0 0', paddingTop:'12px', borderTop:'1px solid \\x23e0e0e0'}},
+                            '🗺️ To clear cached QRZ locations, go to Settings → Activator Toolkit for SOTA.'
                         )
                     )
                 );
@@ -1305,6 +1284,42 @@ add_action('enqueue_block_editor_assets', function() {
         });
     ");
 });
+
+// Settings page: enqueue clear-cache button script
+add_action( 'admin_enqueue_scripts', function( $hook ) {
+    if ( $hook !== 'settings_page_activator-toolkit-settings' ) return;
+    wp_register_script( 'sota-settings-js', '', [], '1.0.0', true );
+    wp_localize_script( 'sota-settings-js', 'sotaMagicSettings', [
+        'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+        'nonce'   => wp_create_nonce( 'sota_magic_clear_qrz_cache' ),
+    ] );
+    wp_add_inline_script( 'sota-settings-js', "
+        document.addEventListener('DOMContentLoaded', function() {
+            var btn = document.getElementById('sota-clear-cache-btn');
+            var result = document.getElementById('sota-clear-cache-result');
+            if (!btn) return;
+            btn.addEventListener('click', function() {
+                btn.disabled = true;
+                btn.textContent = 'Clearing\u2026';
+                result.style.display = 'none';
+                fetch(sotaMagicSettings.ajaxUrl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=sota_magic_clear_qrz_cache&_ajax_nonce=' + sotaMagicSettings.nonce
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    result.style.display = 'block';
+                    result.style.color   = data.success ? '#28a745' : '#c0392b';
+                    result.textContent   = data.success ? '\u2713 ' + data.data : '\u2717 Error clearing cache';
+                    btn.textContent = 'Clear All Cached QRZ Locations';
+                    btn.disabled = false;
+                });
+            });
+        });
+    " );
+    wp_enqueue_script( 'sota-settings-js' );
+} );
 
 // RENDER
 function sota_parse_time_override($hhmm) {
