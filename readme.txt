@@ -3,7 +3,7 @@ Contributors: ki6cr, creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 1.0.5
+Stable tag: 1.0.6
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -147,6 +147,9 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.0.6 =
+* Fix: Contact map assets now use wp_enqueue_style(), wp_enqueue_script(), and wp_add_inline_script() with wp_print_styles()/wp_print_scripts() called manually — correct WordPress API usage for a standalone HTML page served via wp_ajax_*
 
 = 1.0.5 =
 * Fix: Contact map JS moved to external contact-map.js; inline script reduced to a single JSON data assignment (wp_localize_script pattern)

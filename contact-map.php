@@ -376,16 +376,23 @@ $sota_magic_map_data = [
     'unresolved' => $sota_magic_unresolved,
     'debug'      => $sota_magic_debug_mode,
 ];
+
+// Enqueue styles and scripts using WordPress APIs.
+// This is a standalone HTML document served via wp_ajax_*; wp_head()/wp_footer() are never
+// called automatically, so we call wp_print_styles() / wp_print_scripts() manually below.
+wp_enqueue_style( 'sota-cm-leaflet', plugins_url( 'lib/leaflet.css',  __FILE__ ), [],                      '1.9.4' );
+wp_enqueue_style( 'sota-cm-css',     plugins_url( 'contact-map.css', __FILE__ ), [],                      '1.0.5' );
+wp_enqueue_script( 'sota-cm-leaflet-js', plugins_url( 'lib/leaflet.js',  __FILE__ ), [],                      '1.9.4', false );
+wp_enqueue_script( 'sota-cm-js',         plugins_url( 'contact-map.js', __FILE__ ), [ 'sota-cm-leaflet-js' ], '1.0.5', true  );
+wp_add_inline_script( 'sota-cm-js', 'var sotaContactMapData = ' . wp_json_encode( $sota_magic_map_data ) . ';', 'before' );
 ?>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>SOTA Contact Map</title>
-    <?php // phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- standalone HTML doc served via admin-ajax.php; wp_enqueue hooks have already fired. ?>
-    <link rel="stylesheet" href="<?php echo esc_url( plugins_url( 'lib/leaflet.css', __FILE__ ) ); ?>">
-    <link rel="stylesheet" href="<?php echo esc_url( plugins_url( 'contact-map.css', __FILE__ ) ); ?>">
-    <?php // phpcs:enable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet ?>
+    <?php wp_print_styles( [ 'sota-cm-leaflet', 'sota-cm-css' ] ); ?>
+    <?php wp_print_scripts( [ 'sota-cm-leaflet-js' ] ); ?>
 </head>
 <body>
     <div id="loading-overlay">
@@ -396,14 +403,7 @@ $sota_magic_map_data = [
 
     <div id="map"></div>
 
-    <?php
-    // Data assignment only — all JS logic is in the external contact-map.js file.
-    // phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedScript -- standalone HTML doc served via admin-ajax.php; wp_enqueue hooks have already fired.
-    echo '<script>var sotaContactMapData = ' . wp_json_encode( $sota_magic_map_data ) . ';</script>' . "\n";
-    echo '<script src="' . esc_url( plugins_url( 'lib/leaflet.js',    __FILE__ ) ) . '"></script>' . "\n";
-    echo '<script src="' . esc_url( plugins_url( 'contact-map.js',    __FILE__ ) ) . '"></script>' . "\n";
-    // phpcs:enable WordPress.WP.EnqueuedResources.NonEnqueuedScript
-    ?>
+    <?php wp_print_scripts( [ 'sota-cm-js' ] ); ?>
 
     <?php if ( $sota_magic_debug_mode ) : ?>
     <div style="position:fixed;bottom:0;left:0;right:0;background:#fff3cd;border-top:2px solid #ffc107;padding:8px 12px;font-size:11px;font-family:monospace;z-index:99999;max-height:35vh;overflow-y:auto;">

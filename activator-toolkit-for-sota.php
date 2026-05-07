@@ -3,7 +3,7 @@
  * Plugin Name: Activator Toolkit for SOTA
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
- * Version: 1.0.5
+ * Version: 1.0.6
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
@@ -173,7 +173,7 @@ function sota_magic_settings_page() {
     }
     ?>
     <div class="wrap">
-        <h1><img src="<?php echo esc_url(plugins_url('lib/activator-toolkit-logo-128.png', __FILE__)); ?>" alt="Activator Toolkit for SOTA" style="height:48px;vertical-align:middle;margin-right:10px;">Activator Toolkit for SOTA Settings</h1>
+        <h1><img src="<?php echo esc_url(plugins_url('lib/activator-toolkit-logo.svg', __FILE__)); ?>" alt="Activator Toolkit for SOTA" style="height:48px;vertical-align:middle;margin-right:10px;">Activator Toolkit for SOTA Settings</h1>
         <?php
         $sota_magic_data = get_plugin_data( __FILE__ );
         ?>
