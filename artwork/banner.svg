@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 1544 500">
+  <!-- Generator: Adobe Illustrator 30.4.0, SVG Export Plug-In . SVG Version: 2.1.4 Build 226)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #8c8a86;
+        font-size: 23px;
+        letter-spacing: .04em;
+      }
+
+      .st0, .st1 {
+        font-family: HelveticaNeue, 'Helvetica Neue';
+      }
+
+      .st0, .st1, .st2, .st3, .st4, .st5, .st6, .st7, .st8 {
+        isolation: isolate;
+      }
+
+      .st9 {
+        stroke: #d0cdc8;
+      }
+
+      .st9, .st2, .st3, .st10, .st11, .st5, .st6, .st12, .st13 {
+        fill: none;
+      }
+
+      .st1 {
+        font-size: 18px;
+        letter-spacing: .04em;
+      }
+
+      .st1, .st8 {
+        fill: #aaa8a4;
+      }
+
+      .st14 {
+        fill: #f0eeea;
+      }
+
+      .st2 {
+        stroke-width: 2.3px;
+      }
+
+      .st2, .st3 {
+        stroke: #fb0032;
+      }
+
+      .st2, .st3, .st5, .st6, .st12 {
+        stroke-miterlimit: 11.52;
+      }
+
+      .st2, .st6 {
+        opacity: .2;
+      }
+
+      .st15, .st4 {
+        fill: #fb0032;
+      }
+
+      .st3 {
+        opacity: .45;
+        stroke-width: 3.46px;
+      }
+
+      .st4 {
+        font-size: 92px;
+        letter-spacing: .06em;
+      }
+
+      .st4, .st7, .st8 {
+        font-family: HelveticaNeue-Bold, 'Helvetica Neue';
+        font-weight: 700;
+      }
+
+      .st10 {
+        stroke: #e0ddd8;
+        stroke-width: 1.5px;
+      }
+
+      .st11 {
+        stroke: #e8e5e0;
+      }
+
+      .st5 {
+        opacity: .35;
+      }
+
+      .st5, .st6 {
+        stroke: #8c8a86;
+        stroke-width: 1.44px;
+      }
+
+      .st12 {
+        stroke-width: 4.32px;
+      }
+
+      .st12, .st13 {
+        stroke: #1c1b19;
+      }
+
+      .st7 {
+        fill: #1c1b19;
+        font-size: 62px;
+        letter-spacing: .06em;
+      }
+
+      .st13 {
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 7.2px;
+      }
+
+      .st8 {
+        font-size: 38px;
+        letter-spacing: .06em;
+      }
+    </style>
+  </defs>
+  <rect class="st14" width="1544" height="500"/>
+  <circle class="st10" cx="250" cy="250" r="230"/>
+  <circle class="st11" cx="250" cy="250" r="295"/>
+  <g>
+    <circle class="st12" cx="250" cy="250" r="144"/>
+    <path class="st5" d="M143.44,309.04c32.63-11.52,68.17-14.4,106.56-8.64,38.39-9.59,73.93-10.57,106.56-2.88"/>
+    <path class="st6" d="M154.96,326.32c34.56-11.52,66.24-14.4,95.04-8.64,38.39-9.59,70.07-10.57,95.04-2.88"/>
+    <path class="st13" d="M166.48,320.56l48.96-86.4,20.16,23.04,34.56-57.6,63.36,120.96"/>
+    <circle class="st15" cx="270.16" cy="193.84" r="10.08"/>
+    <circle class="st3" cx="270.16" cy="193.84" r="25.92"/>
+    <circle class="st2" cx="270.16" cy="193.84" r="43.2"/>
+  </g>
+  <line class="st9" x1="490" y1="70" x2="490" y2="430"/>
+  <text class="st7" transform="translate(548 148)"><tspan x="0" y="0">ACTIVATOR TOOLKIT</tspan></text>
+  <text class="st8" transform="translate(548 222)"><tspan x="0" y="0">for</tspan></text>
+  <text class="st4" transform="translate(547 328)"><tspan x="0" y="0">SOTA</tspan></text>
+  <line class="st9" x1="548" y1="362" x2="1080" y2="362"/>
+  <text class="st0" transform="translate(548 404)"><tspan x="0" y="0">GPX tracks · elevation charts · contact maps</tspan></text>
+  <text class="st1" transform="translate(548 440)"><tspan x="0" y="0">A Gutenberg block plugin for ham radio operators</tspan></text>
+</svg>

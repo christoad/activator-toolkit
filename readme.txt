@@ -1,5 +1,5 @@
 === Activator Toolkit for SOTA ===
-Contributors: ki6cr, creddick
+Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 6.9
