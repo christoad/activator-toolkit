@@ -3,7 +3,7 @@ Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 1.0.7
+Stable tag: 1.1.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -147,6 +147,14 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.1.0 =
+* New: Callook.info lookup — automatic, free, no account needed; resolves US callsigns from FCC data
+* New: HamQTH lookup — free account, international coverage; runs after Callook for non-US callsigns
+* Improve: Callsign lookup now tries Callook → HamQTH → QRZ in priority order before marking a contact unresolved
+* Improve: Settings page reorganized into tabs: Display, Callsign Lookup, GPX Track, Developer
+* Improve: Cache clearing now preserves S2S summit location cache; only callsign lookup entries are cleared
+* Fix: Debug Mode (public) checkbox was not being saved — now works correctly
 
 = 1.0.7 =
 * Fix: QRZ password now preserved exactly as entered — special characters no longer stripped before encryption

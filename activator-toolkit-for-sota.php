@@ -3,7 +3,7 @@
  * Plugin Name: Activator Toolkit for SOTA
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
- * Version: 1.0.7
+ * Version: 1.1.0-beta
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
@@ -123,6 +123,8 @@ add_action('admin_init', function() {
         'sota_s2s_highlight'          => [ 'sanitize_hex_color',             '#ffebee' ],
         'sota_s2s_text_color'         => [ 'sanitize_hex_color',             '#d32f2f' ],
         'sota_show_contact_map'       => [ 'absint',                         1 ],
+        'sota_hamqth_username'        => [ 'sanitize_text_field',            '' ],
+        'sota_hamqth_password'        => [ 'sota_magic_sanitize_password',   '' ],
         'sota_qrz_username'           => [ 'sanitize_text_field',            '' ],
         'sota_qrz_password'           => [ 'sota_magic_sanitize_password',   '' ],
         'sota_show_gpx_stats'         => [ 'absint',                         1 ],
@@ -143,7 +145,16 @@ add_action('admin_init', function() {
 
 function sota_magic_settings_page() {
     if (!current_user_can('manage_options')) return;
-    
+
+    $sota_magic_valid_tabs = ['display', 'lookup', 'gpx', 'developer'];
+    $sota_current_tab = 'display';
+    if (isset($_POST['sota_magic_save'])) {
+        $sota_current_tab = sanitize_key($_POST['sota_active_tab'] ?? 'display');
+    } elseif (isset($_GET['tab'])) {
+        $sota_current_tab = sanitize_key($_GET['tab']);
+    }
+    if (!in_array($sota_current_tab, $sota_magic_valid_tabs, true)) $sota_current_tab = 'display';
+
     if (isset($_POST['sota_magic_save'])) {
         check_admin_referer('sota_magic_settings');
         update_option('sota_headline_gpx', sanitize_text_field(wp_unslash($_POST['sota_headline_gpx'] ?? '')));
@@ -156,6 +167,11 @@ function sota_magic_settings_page() {
         update_option('sota_s2s_highlight', sanitize_hex_color(wp_unslash($_POST['sota_s2s_highlight'] ?? '')));
         update_option('sota_s2s_text_color', sanitize_hex_color(wp_unslash($_POST['sota_s2s_text_color'] ?? '')));
         update_option('sota_show_contact_map', isset($_POST['sota_show_contact_map']) ? 1 : 0);
+        update_option('sota_hamqth_username', sanitize_text_field(wp_unslash($_POST['sota_hamqth_username'] ?? '')));
+        $sota_magic_hamqth_pass = wp_unslash($_POST['sota_hamqth_password'] ?? ''); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- password encrypted immediately
+        if (!empty($sota_magic_hamqth_pass)) {
+            update_option('sota_hamqth_password', sota_magic_encrypt_credential($sota_magic_hamqth_pass));
+        }
         update_option('sota_qrz_username', sanitize_text_field(wp_unslash($_POST['sota_qrz_username'] ?? '')));
         $sota_magic_new_pass = wp_unslash($_POST['sota_qrz_password'] ?? ''); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- password is immediately encrypted; no sanitizer can run without corrupting special characters
         if (!empty($sota_magic_new_pass)) {
@@ -168,106 +184,183 @@ function sota_magic_settings_page() {
         update_option('sota_rest_threshold_minutes', sanitize_text_field(wp_unslash($_POST['sota_rest_threshold_minutes'] ?? '')));
         update_option('sota_use_azapi', isset($_POST['sota_use_azapi']) ? 1 : 0);
         update_option('sota_debug_mode', isset($_POST['sota_debug_mode']) ? 1 : 0);
+        update_option('sota_debug_mode_public', isset($_POST['sota_debug_mode_public']) ? 1 : 0);
         update_option('sota_default_map_layer', sanitize_text_field(wp_unslash($_POST['sota_default_map_layer'] ?? 'topo')));
-        echo '<div class="notice notice-success"><p>Settings saved!</p></div>';
+        echo '<div class="notice notice-success is-dismissible"><p>Settings saved.</p></div>';
     }
     ?>
     <div class="wrap">
         <h1><img src="<?php echo esc_url(plugins_url('lib/activator-toolkit-logo.svg', __FILE__)); ?>" alt="Activator Toolkit for SOTA" style="height:48px;vertical-align:middle;margin-right:10px;">Activator Toolkit for SOTA Settings</h1>
-        <?php
-        $sota_magic_data = get_plugin_data( __FILE__ );
-        ?>
+        <?php $sota_magic_data = get_plugin_data( __FILE__ ); ?>
         <p style="font-size:12px;color:#666;"><em>Created by KI6CR &mdash; Version <?php echo esc_html( $sota_magic_data['Version'] ); ?></em></p>
-        
-        <form method="post" action="">
-            <?php wp_nonce_field('sota_magic_settings'); ?>
-            <table class="form-table">
-                <tr><th colspan="2"><h2>Headlines</h2></th></tr>
-                <tr><th>GPX Headline</th><td><input type="text" name="sota_headline_gpx" value="<?php echo esc_attr(get_option('sota_headline_gpx')); ?>" class="regular-text" /></td></tr>
-                <tr><th>CSV Headline</th><td><input type="text" name="sota_headline_csv" value="<?php echo esc_attr(get_option('sota_headline_csv')); ?>" class="regular-text" /></td></tr>
-                <tr><th>Map Headline</th><td><input type="text" name="sota_headline_map" value="<?php echo esc_attr(get_option('sota_headline_map')); ?>" class="regular-text" /></td></tr>
-                
-                <tr><th colspan="2"><h2>Colors</h2></th></tr>
-                <tr><th>Background</th><td><input type="color" name="sota_bg_color" value="<?php echo esc_attr(get_option('sota_bg_color')); ?>" /></td></tr>
-                <tr><th>Text</th><td><input type="color" name="sota_text_color" value="<?php echo esc_attr(get_option('sota_text_color')); ?>" /></td></tr>
-                <tr><th>Transparent BG</th><td><input type="checkbox" name="sota_is_transparent" value="1" <?php checked(1, get_option('sota_is_transparent')); ?> /></td></tr>
-                <tr><th>Use Theme Font</th><td><input type="checkbox" name="sota_use_theme_font" value="1" <?php checked(1, get_option('sota_use_theme_font')); ?> /></td></tr>
-                
-                <tr><th colspan="2"><h2>S2S Highlighting</h2></th></tr>
-                <tr><th>S2S Background</th><td><input type="color" name="sota_s2s_highlight" value="<?php echo esc_attr(get_option('sota_s2s_highlight')); ?>" /></td></tr>
-                <tr><th>S2S Text</th><td><input type="color" name="sota_s2s_text_color" value="<?php echo esc_attr(get_option('sota_s2s_text_color')); ?>" /></td></tr>
-                
-                <tr><th colspan="2"><h2>GPX Track Analysis</h2></th></tr>
-                <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
-                    <strong>How Hiking vs. Activation Time is Calculated:</strong><br>
-                    The plugin can use two methods to determine the activation zone:<br>
-                    <strong>1. Activation.Zone API (Recommended):</strong> Queries api.activation.zone for the precise activation zone based on terrain elevation data (25m vertical drop per SOTA rules). Most accurate!<br>
-                    <strong>2. Fallback Method:</strong> Uses a simple radius around the highest GPS point. Used automatically if the API is unavailable or disabled.<br><br>
-                    <strong>All time spent within the activation zone counts as activation time</strong> (regardless of movement - you're often adjusting antenna, repositioning, taking photos, etc.). All other time (including rest breaks during the hike) counts as hiking time, with rest breaks shown as a sub-note for reference.
-                </p></th></tr>
-                <tr><th>Use Activation.Zone API</th><td>
-                    <input type="checkbox" name="sota_use_azapi" value="1" <?php checked(1, get_option('sota_use_azapi')); ?> />
-                    <br><small>Query <a href="https://activation.zone" target="_blank">activation.zone</a> (by N6ARA) for precise activation zone geometry based on terrain data. If disabled or API fails, falls back to radius method.</small>
-                </td></tr>
-                <tr><th>Show GPX Statistics</th><td><input type="checkbox" name="sota_show_gpx_stats" value="1" <?php checked(1, get_option('sota_show_gpx_stats')); ?> /><br><small>Display hiking time, activation time, and other statistics</small></td></tr>
-                <tr><th>Unit System</th><td>
-                    <select name="sota_unit_system">
-                        <option value="metric" <?php selected('metric', get_option('sota_unit_system')); ?>>Metric (km, m, km/h)</option>
-                        <option value="imperial" <?php selected('imperial', get_option('sota_unit_system')); ?>>Imperial (mi, ft, mph)</option>
-                    </select>
-                    <br><small>Choose how distances and speeds are displayed</small>
-                </td></tr>
-                <tr><th>Default Map Layer</th><td>
-                    <select name="sota_default_map_layer">
-                        <option value="topo" <?php selected('topo', get_option('sota_default_map_layer')); ?>>Topographic (OpenTopoMap)</option>
-                        <option value="osm" <?php selected('osm', get_option('sota_default_map_layer')); ?>>OpenStreetMap</option>
-                        <option value="carto" <?php selected('carto', get_option('sota_default_map_layer')); ?>>Minimal (CartoDB)</option>
-                    </select>
-                    <br><small>Which base map layer loads by default on the GPX track map</small>
-                </td></tr>
-                <tr><th>Activation Zone Radius</th><td><input type="number" name="sota_activation_zone_radius" value="<?php echo esc_attr(get_option('sota_activation_zone_radius')); ?>" step="10" min="20" max="200" style="width:80px;" /> meters<br><small>Used as fallback if Activation.Zone API is disabled or unavailable (default: 50m)</small></td></tr>
-                <tr><th>Rest Break Threshold</th><td><input type="number" name="sota_rest_threshold_minutes" value="<?php echo esc_attr(get_option('sota_rest_threshold_minutes')); ?>" step="1" min="1" max="30" style="width:80px;" /> minutes<br><small>Minimum duration to count as a rest break. Short stops (photos, water) won't count as breaks. (default: 3 min)</small></td></tr>
-                <tr><th>Stationary Speed Threshold</th><td><input type="number" name="sota_stationary_threshold" value="<?php echo esc_attr(get_option('sota_stationary_threshold')); ?>" step="0.1" min="0.1" max="2.0" style="width:80px;" /> km/h<br><small>Speed below this is considered stationary (default: 0.3 km/h)</small></td></tr>
-                
-                <tr><th colspan="2"><h2>Contact Map</h2></th></tr>
-                <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
-                    <strong>How Contact Locations are Determined (in priority order):</strong><br>
-                    • <strong>Grid square in Comments field:</strong> Plotted directly from Maidenhead grid — no QRZ needed<br>
-                    • <strong>Summit-to-Summit (S2S) contacts:</strong> Exact summit coordinates from the free SOTA API — no QRZ needed<br>
-                    • <strong>All other contacts:</strong> Station location looked up via QRZ.com XML API (requires a QRZ XML subscription — see below)<br>
-                    • Contacts that cannot be located are listed in a "No location found" panel on the map<br>
-                    • Locations are cached after the first lookup for performance
-                </p></th></tr>
-                <tr><th>Show Contact Map</th><td><input type="checkbox" name="sota_show_contact_map" value="1" <?php checked(1, get_option('sota_show_contact_map')); ?> /></td></tr>
-                <tr><th>QRZ Username</th><td><input type="text" name="sota_qrz_username" value="<?php echo esc_attr(get_option('sota_qrz_username')); ?>" class="regular-text" /><br><small>Your QRZ.com callsign. <strong>Requires a QRZ XML subscription</strong> — a free QRZ account does not include XML access. <a href="https://www.qrz.com/page/xml_data.html" target="_blank">Learn more at QRZ.com</a>.</small></td></tr>
-                <tr><th>QRZ Password</th><td><input type="password" name="sota_qrz_password" value="" placeholder="<?php echo get_option('sota_qrz_password') ? esc_attr('(saved — leave blank to keep current password)') : ''; ?>" class="regular-text" /><br><small>Your QRZ.com password. Leave blank to keep the current saved password.</small></td></tr>
-                <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
-                    <strong>How QRZ location caching works:</strong><br>
-                    When a contact map loads and a contact's location isn't already stored, the plugin looks it up via the QRZ XML API and saves the result to your database. Subsequent map loads use the cached location instantly — no QRZ API call needed.<br><br>
-                    Locations are cached permanently rather than expiring. This is intentional: a ham's QRZ address at the <em>time of your activation</em> is the historically accurate location for that contact. If a station has since moved, their new address would be geographically misleading on an old activation's map.
-                </p></th></tr>
-                <tr><th>Clear QRZ Location Cache</th><td>
-                    <button type="button" id="sota-clear-cache-btn" class="button button-secondary">Clear All Cached QRZ Locations</button>
-                    <p class="description" style="margin-top:6px;color:#c0392b;"><strong>⚠ Nuclear option:</strong> Wipes all cached QRZ locations for every post site-wide. The next time any contact map loads, every non-grid, non-S2S contact will trigger a fresh QRZ lookup. Only use this if you believe cached locations are incorrect.</p>
-                    <p id="sota-clear-cache-result" style="margin-top:6px;font-weight:bold;display:none;"></p>
-                    <?php wp_add_inline_script( 'jquery', '' ); // ensure jQuery hint — actual script below via wp_add_inline_script ?>
-                </td></tr>
 
-                <tr><th colspan="2"><h2>Developer Tools</h2></th></tr>
-                <tr><th>Debug Mode (admin only)</th><td>
-                    <input type="checkbox" name="sota_debug_mode" value="1" <?php checked(1, get_option('sota_debug_mode')); ?> />
-                    <br><small>Shows technical debug panels <strong>visible only to logged-in admins</strong>. Safe to leave on without affecting public visitors. Enables two panels:
-                    <br>• <strong>GPX stats page</strong> — API response details, polygon vertex count, points-in-zone count, and speed ranges
-                    <br>• <strong>Contact map</strong> — summit lookup result, contacts resolved, per-contact location source, and lines-drawn count</small>
-                </td></tr>
-                <tr><th>Debug Mode (public)</th><td>
-                    <input type="checkbox" name="sota_debug_mode_public" value="1" <?php checked(1, get_option('sota_debug_mode_public')); ?> />
-                    <br><small>Same debug panels as above but <strong>visible to all visitors</strong> — use temporarily when testing while logged out. Disable when done.</small>
-                </td></tr>
-            </table>
+        <h2 class="nav-tab-wrapper">
+            <a href="#" data-tab="display"    class="nav-tab <?php echo $sota_current_tab === 'display'    ? 'nav-tab-active' : ''; ?>">Display</a>
+            <a href="#" data-tab="lookup"     class="nav-tab <?php echo $sota_current_tab === 'lookup'     ? 'nav-tab-active' : ''; ?>">Callsign Lookup</a>
+            <a href="#" data-tab="gpx"        class="nav-tab <?php echo $sota_current_tab === 'gpx'        ? 'nav-tab-active' : ''; ?>">GPX Track</a>
+            <a href="#" data-tab="developer"  class="nav-tab <?php echo $sota_current_tab === 'developer'  ? 'nav-tab-active' : ''; ?>">Developer</a>
+        </h2>
+
+        <form method="post" action="">
+            <input type="hidden" name="sota_active_tab" id="sota_active_tab" value="<?php echo esc_attr($sota_current_tab); ?>">
+            <?php wp_nonce_field('sota_magic_settings'); ?>
+
+            <!-- Tab: Display -->
+            <div id="sota-tab-display" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'display' ? '' : 'display:none;'; ?>">
+                <table class="form-table">
+                    <tr><th colspan="2"><h2>Headlines</h2></th></tr>
+                    <tr><th>GPX Headline</th><td><input type="text" name="sota_headline_gpx" value="<?php echo esc_attr(get_option('sota_headline_gpx')); ?>" class="regular-text" /></td></tr>
+                    <tr><th>CSV Headline</th><td><input type="text" name="sota_headline_csv" value="<?php echo esc_attr(get_option('sota_headline_csv')); ?>" class="regular-text" /></td></tr>
+                    <tr><th>Map Headline</th><td><input type="text" name="sota_headline_map" value="<?php echo esc_attr(get_option('sota_headline_map')); ?>" class="regular-text" /></td></tr>
+
+                    <tr><th colspan="2"><h2>Colors</h2></th></tr>
+                    <tr><th>Background</th><td><input type="color" name="sota_bg_color" value="<?php echo esc_attr(get_option('sota_bg_color')); ?>" /></td></tr>
+                    <tr><th>Text</th><td><input type="color" name="sota_text_color" value="<?php echo esc_attr(get_option('sota_text_color')); ?>" /></td></tr>
+                    <tr><th>Transparent BG</th><td><input type="checkbox" name="sota_is_transparent" value="1" <?php checked(1, get_option('sota_is_transparent')); ?> /></td></tr>
+                    <tr><th>Use Theme Font</th><td><input type="checkbox" name="sota_use_theme_font" value="1" <?php checked(1, get_option('sota_use_theme_font')); ?> /></td></tr>
+
+                    <tr><th colspan="2"><h2>S2S Highlighting</h2></th></tr>
+                    <tr><th>S2S Background</th><td><input type="color" name="sota_s2s_highlight" value="<?php echo esc_attr(get_option('sota_s2s_highlight')); ?>" /></td></tr>
+                    <tr><th>S2S Text</th><td><input type="color" name="sota_s2s_text_color" value="<?php echo esc_attr(get_option('sota_s2s_text_color')); ?>" /></td></tr>
+
+                    <tr><th colspan="2"><h2>Contact Map</h2></th></tr>
+                    <tr><th>Show Contact Map</th><td><input type="checkbox" name="sota_show_contact_map" value="1" <?php checked(1, get_option('sota_show_contact_map')); ?> /></td></tr>
+                </table>
+            </div>
+
+            <!-- Tab: Callsign Lookup -->
+            <div id="sota-tab-lookup" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'lookup' ? '' : 'display:none;'; ?>">
+                <table class="form-table">
+                    <tr><th colspan="2"><h2>How Contact Locations Are Determined</h2></th></tr>
+                    <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
+                        <strong>Priority order for locating each contact:</strong><br>
+                        1. <strong>Grid square in Comments field</strong> — plotted from Maidenhead grid, no lookup needed<br>
+                        2. <strong>Summit-to-Summit (S2S)</strong> — exact summit coordinates from the free SOTA API<br>
+                        3. <strong>Callook.info</strong> — automatic free lookup for US callsigns (FCC data, no account needed)<br>
+                        4. <strong>HamQTH</strong> — free account lookup, international coverage<br>
+                        5. <strong>QRZ.com</strong> — paid subscription lookup, international coverage<br>
+                        <br>Locations are cached permanently after the first lookup. A ham's address at the <em>time of your activation</em> is the historically accurate location — if they've since moved, the cached address is intentionally kept.
+                    </p></th></tr>
+
+                    <tr><th colspan="2"><h2>Callook.info <span style="font-weight:normal;font-size:13px;color:#28a745;">&#10003; Free &mdash; no account needed</span></h2></th></tr>
+                    <tr><th colspan="2"><p style="color:#555;padding:0 0 10px;">Callook.info serves US callsigns from FCC data. It runs automatically for every contact — no configuration needed. Non-US callsigns fall through to HamQTH or QRZ.</p></th></tr>
+
+                    <tr><th colspan="2"><h2>HamQTH <span style="font-weight:normal;font-size:13px;color:#0073aa;">Free account required</span></h2></th></tr>
+                    <tr><th>HamQTH Username</th><td>
+                        <input type="text" name="sota_hamqth_username" value="<?php echo esc_attr(get_option('sota_hamqth_username')); ?>" class="regular-text" />
+                        <br><small>Your HamQTH.com callsign. <a href="https://www.hamqth.com/register.php" target="_blank">Register free at HamQTH.com</a> — no paid subscription required. Provides international callsign location data.</small>
+                    </td></tr>
+                    <tr><th>HamQTH Password</th><td>
+                        <input type="password" name="sota_hamqth_password" value="" placeholder="<?php echo get_option('sota_hamqth_password') ? esc_attr('(saved — leave blank to keep current password)') : ''; ?>" class="regular-text" />
+                        <br><small>Your HamQTH.com password. Leave blank to keep the current saved password.</small>
+                    </td></tr>
+
+                    <tr><th colspan="2"><h2>QRZ.com <span style="font-weight:normal;font-size:13px;color:#888;">Paid XML subscription required</span></h2></th></tr>
+                    <tr><th>QRZ Username</th><td>
+                        <input type="text" name="sota_qrz_username" value="<?php echo esc_attr(get_option('sota_qrz_username')); ?>" class="regular-text" />
+                        <br><small>Your QRZ.com callsign. <strong>Requires a QRZ XML subscription</strong> — a free QRZ account does not include XML access. <a href="https://www.qrz.com/page/xml_data.html" target="_blank">Learn more at QRZ.com</a>.</small>
+                    </td></tr>
+                    <tr><th>QRZ Password</th><td>
+                        <input type="password" name="sota_qrz_password" value="" placeholder="<?php echo get_option('sota_qrz_password') ? esc_attr('(saved — leave blank to keep current password)') : ''; ?>" class="regular-text" />
+                        <br><small>Your QRZ.com password. Leave blank to keep the current saved password.</small>
+                    </td></tr>
+
+                    <tr><th colspan="2"><h2>Location Cache</h2></th></tr>
+                    <tr><th>Clear Cached Locations</th><td>
+                        <button type="button" id="sota-clear-cache-btn" class="button button-secondary">Clear All Cached Locations</button>
+                        <p class="description" style="margin-top:6px;color:#c0392b;"><strong>⚠ Nuclear option:</strong> Wipes all cached callsign locations site-wide. The next time any contact map loads, every non-grid, non-S2S contact will trigger a fresh lookup. Only use this if you believe cached locations are incorrect.</p>
+                        <p id="sota-clear-cache-result" style="margin-top:6px;font-weight:bold;display:none;"></p>
+                    </td></tr>
+                </table>
+            </div>
+
+            <!-- Tab: GPX Track -->
+            <div id="sota-tab-gpx" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'gpx' ? '' : 'display:none;'; ?>">
+                <table class="form-table">
+                    <tr><th colspan="2"><h2>Activation Zone</h2></th></tr>
+                    <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
+                        <strong>How Hiking vs. Activation Time is Calculated:</strong><br>
+                        The plugin can use two methods to determine the activation zone:<br>
+                        <strong>1. Activation.Zone API (Recommended):</strong> Queries api.activation.zone for the precise activation zone based on terrain elevation data (25m vertical drop per SOTA rules). Most accurate!<br>
+                        <strong>2. Fallback Method:</strong> Uses a simple radius around the highest GPS point. Used automatically if the API is unavailable or disabled.<br><br>
+                        <strong>All time spent within the activation zone counts as activation time</strong> (regardless of movement). All other time counts as hiking time, with rest breaks shown as a sub-note.
+                    </p></th></tr>
+                    <tr><th>Use Activation.Zone API</th><td>
+                        <input type="checkbox" name="sota_use_azapi" value="1" <?php checked(1, get_option('sota_use_azapi')); ?> />
+                        <br><small>Query <a href="https://activation.zone" target="_blank">activation.zone</a> (by N6ARA) for precise activation zone geometry based on terrain data. If disabled or API fails, falls back to radius method.</small>
+                    </td></tr>
+                    <tr><th>Activation Zone Radius</th><td>
+                        <input type="number" name="sota_activation_zone_radius" value="<?php echo esc_attr(get_option('sota_activation_zone_radius')); ?>" step="10" min="20" max="200" style="width:80px;" /> meters
+                        <br><small>Used as fallback if Activation.Zone API is disabled or unavailable (default: 50m)</small>
+                    </td></tr>
+
+                    <tr><th colspan="2"><h2>Display &amp; Units</h2></th></tr>
+                    <tr><th>Show GPX Statistics</th><td><input type="checkbox" name="sota_show_gpx_stats" value="1" <?php checked(1, get_option('sota_show_gpx_stats')); ?> /><br><small>Display hiking time, activation time, and other statistics</small></td></tr>
+                    <tr><th>Unit System</th><td>
+                        <select name="sota_unit_system">
+                            <option value="metric" <?php selected('metric', get_option('sota_unit_system')); ?>>Metric (km, m, km/h)</option>
+                            <option value="imperial" <?php selected('imperial', get_option('sota_unit_system')); ?>>Imperial (mi, ft, mph)</option>
+                        </select>
+                        <br><small>Choose how distances and speeds are displayed</small>
+                    </td></tr>
+                    <tr><th>Default Map Layer</th><td>
+                        <select name="sota_default_map_layer">
+                            <option value="topo" <?php selected('topo', get_option('sota_default_map_layer')); ?>>Topographic (OpenTopoMap)</option>
+                            <option value="osm" <?php selected('osm', get_option('sota_default_map_layer')); ?>>OpenStreetMap</option>
+                            <option value="carto" <?php selected('carto', get_option('sota_default_map_layer')); ?>>Minimal (CartoDB)</option>
+                        </select>
+                        <br><small>Which base map layer loads by default on the GPX track map</small>
+                    </td></tr>
+
+                    <tr><th colspan="2"><h2>Track Analysis</h2></th></tr>
+                    <tr><th>Rest Break Threshold</th><td>
+                        <input type="number" name="sota_rest_threshold_minutes" value="<?php echo esc_attr(get_option('sota_rest_threshold_minutes')); ?>" step="1" min="1" max="30" style="width:80px;" /> minutes
+                        <br><small>Minimum duration to count as a rest break. Short stops (photos, water) won't count. (default: 3 min)</small>
+                    </td></tr>
+                    <tr><th>Stationary Speed Threshold</th><td>
+                        <input type="number" name="sota_stationary_threshold" value="<?php echo esc_attr(get_option('sota_stationary_threshold')); ?>" step="0.1" min="0.1" max="2.0" style="width:80px;" /> km/h
+                        <br><small>Speed below this is considered stationary (default: 0.3 km/h)</small>
+                    </td></tr>
+                </table>
+            </div>
+
+            <!-- Tab: Developer -->
+            <div id="sota-tab-developer" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'developer' ? '' : 'display:none;'; ?>">
+                <table class="form-table">
+                    <tr><th colspan="2"><h2>Debug Mode</h2></th></tr>
+                    <tr><th>Debug Mode (admin only)</th><td>
+                        <input type="checkbox" name="sota_debug_mode" value="1" <?php checked(1, get_option('sota_debug_mode')); ?> />
+                        <br><small>Shows technical debug panels <strong>visible only to logged-in admins</strong>. Safe to leave on without affecting public visitors. Enables two panels:
+                        <br>• <strong>GPX stats page</strong> — API response details, polygon vertex count, points-in-zone count, and speed ranges
+                        <br>• <strong>Contact map</strong> — summit lookup result, contacts resolved, per-contact location source, and lines-drawn count</small>
+                    </td></tr>
+                    <tr><th>Debug Mode (public)</th><td>
+                        <input type="checkbox" name="sota_debug_mode_public" value="1" <?php checked(1, get_option('sota_debug_mode_public')); ?> />
+                        <br><small>Same debug panels as above but <strong>visible to all visitors</strong> — use temporarily when testing while logged out. Disable when done.</small>
+                    </td></tr>
+                </table>
+            </div>
+
             <?php submit_button('Save Settings', 'primary', 'sota_magic_save'); ?>
         </form>
     </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var tabs = document.querySelectorAll('.nav-tab[data-tab]');
+        var activeInput = document.getElementById('sota_active_tab');
+        tabs.forEach(function(tab) {
+            tab.addEventListener('click', function(e) {
+                e.preventDefault();
+                var t = this.dataset.tab;
+                activeInput.value = t;
+                tabs.forEach(function(el) { el.classList.remove('nav-tab-active'); });
+                this.classList.add('nav-tab-active');
+                document.querySelectorAll('.sota-tab-panel').forEach(function(p) { p.style.display = 'none'; });
+                document.getElementById('sota-tab-' + t).style.display = '';
+            });
+        });
+    });
+    </script>
     <?php
 }
 
@@ -945,15 +1038,15 @@ add_action('init', function() {
     ]);
 });
 
-// AJAX: Clear QRZ location cache
-add_action('wp_ajax_sota_magic_clear_qrz_cache', function() {
-    check_ajax_referer('sota_magic_clear_qrz_cache');
+// AJAX: Clear callsign location cache (preserves S2S summit cache)
+add_action('wp_ajax_sota_magic_clear_location_cache', function() {
+    check_ajax_referer('sota_magic_clear_location_cache');
     if (!current_user_can('manage_options')) wp_send_json_error('Unauthorized.');
     global $wpdb;
     // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
     $table = esc_sql( $wpdb->prefix . 'sota_magic_locations' );
-    $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table" );
-    $wpdb->query( "TRUNCATE TABLE $table" );
+    $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table WHERE source != 'sota'" );
+    $wpdb->query( "DELETE FROM $table WHERE source != 'sota'" );
     // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
     wp_send_json_success($count . ' cached location(s) cleared. Fresh lookups will run on next map load.');
 });
@@ -1004,7 +1097,7 @@ add_action('enqueue_block_editor_assets', function() {
     wp_register_script('sota-editor-js', '', ['wp-blocks','wp-element','wp-editor','wp-components'], '1.0.0', true);
     wp_localize_script('sota-editor-js', 'sotaMagicAdmin', [
         'ajaxUrl' => admin_url('admin-ajax.php'),
-        'nonce'   => wp_create_nonce('sota_magic_clear_qrz_cache'),
+        'nonce'   => wp_create_nonce('sota_magic_clear_location_cache'),
     ]);
     wp_add_inline_script('sota-editor-js', "
         wp.blocks.registerBlockType('ki6cr/sota-data', {
@@ -1275,7 +1368,7 @@ add_action('enqueue_block_editor_assets', function() {
                             )
                         ),
                         wp.element.createElement('p', {style:{fontSize:'11px', color:'\\x23888888', fontFamily:'sans-serif', margin:'16px 0 0', paddingTop:'12px', borderTop:'1px solid \\x23e0e0e0'}},
-                            '🗺️ To clear cached QRZ locations, go to Settings → Activator Toolkit for SOTA.'
+                            '🗺️ To clear cached contact locations, go to Settings → Activator Toolkit for SOTA → Callsign Lookup.'
                         )
                     )
                 );
@@ -1291,7 +1384,7 @@ add_action( 'admin_enqueue_scripts', function( $hook ) {
     wp_register_script( 'sota-settings-js', '', [], '1.0.0', true );
     wp_localize_script( 'sota-settings-js', 'sotaMagicSettings', [
         'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-        'nonce'   => wp_create_nonce( 'sota_magic_clear_qrz_cache' ),
+        'nonce'   => wp_create_nonce( 'sota_magic_clear_location_cache' ),
     ] );
     wp_add_inline_script( 'sota-settings-js', "
         document.addEventListener('DOMContentLoaded', function() {
@@ -1305,14 +1398,14 @@ add_action( 'admin_enqueue_scripts', function( $hook ) {
                 fetch(sotaMagicSettings.ajaxUrl, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'action=sota_magic_clear_qrz_cache&_ajax_nonce=' + sotaMagicSettings.nonce
+                    body: 'action=sota_magic_clear_location_cache&_ajax_nonce=' + sotaMagicSettings.nonce
                 })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     result.style.display = 'block';
                     result.style.color   = data.success ? '#28a745' : '#c0392b';
                     result.textContent   = data.success ? '\u2713 ' + data.data : '\u2717 Error clearing cache';
-                    btn.textContent = 'Clear All Cached QRZ Locations';
+                    btn.textContent = 'Clear All Cached Locations';
                     btn.disabled = false;
                 });
             });

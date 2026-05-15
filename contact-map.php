@@ -57,9 +57,11 @@ if ( ! $sota_magic_csv_url ) {
     exit;
 }
 
-// Get QRZ credentials
-$sota_magic_qrz_user = get_option( 'sota_qrz_username' );
-$sota_magic_qrz_pass = sota_magic_decrypt_credential( get_option( 'sota_qrz_password' ) );
+// Get callsign lookup credentials
+$sota_magic_qrz_user    = get_option( 'sota_qrz_username' );
+$sota_magic_qrz_pass    = sota_magic_decrypt_credential( get_option( 'sota_qrz_password' ) );
+$sota_magic_hamqth_user = get_option( 'sota_hamqth_username' );
+$sota_magic_hamqth_pass = sota_magic_decrypt_credential( get_option( 'sota_hamqth_password' ) );
 
 // Parse CSV via wp_remote_get
 $sota_magic_contacts = [];
@@ -198,10 +200,24 @@ if ( $sota_magic_qrz_user && $sota_magic_qrz_pass ) {
     }
 }
 
+// Get HamQTH session if credentials available (sessions valid for 1 hour)
+$sota_magic_hamqth_session = null;
+if ( $sota_magic_hamqth_user && $sota_magic_hamqth_pass ) {
+    $sota_magic_hamqth_login_url      = 'https://www.hamqth.com/xml.php?u=' . rawurlencode( $sota_magic_hamqth_user ) . '&p=' . rawurlencode( $sota_magic_hamqth_pass );
+    $sota_magic_hamqth_login_wp       = wp_remote_get( $sota_magic_hamqth_login_url, [ 'timeout' => 15, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
+    $sota_magic_hamqth_login_response = ! is_wp_error( $sota_magic_hamqth_login_wp ) ? wp_remote_retrieve_body( $sota_magic_hamqth_login_wp ) : false;
+    if ( $sota_magic_hamqth_login_response ) {
+        preg_match( '/<session_id>([^<]+)<\/session_id>/', $sota_magic_hamqth_login_response, $sota_magic_hamqth_matches );
+        if ( ! empty( $sota_magic_hamqth_matches[1] ) ) {
+            $sota_magic_hamqth_session = $sota_magic_hamqth_matches[1];
+        }
+    }
+}
+
 // Get locations for all contacts
 $sota_magic_contact_locations = [];
 $sota_magic_unresolved        = [];
-$sota_magic_qrz_fail_debug    = []; // Only populated in debug mode
+$sota_magic_lookup_fail_debug = []; // Only populated in debug mode
 foreach ( $sota_magic_contacts as $sota_magic_contact ) {
     $sota_magic_callsign   = $sota_magic_contact['callsign'];
     $sota_magic_comments   = $sota_magic_contact['comments'];
@@ -277,60 +293,140 @@ foreach ( $sota_magic_contacts as $sota_magic_contact ) {
         continue;
     }
 
-    // Priority 3: QRZ.com home address lookup (stored permanently in locations table)
-    if ( $sota_magic_qrz_session ) {
-        $sota_magic_qrz_key = 'qrz_' . sanitize_key( strtolower( $sota_magic_callsign ) );
-        $sota_magic_qrz_row = sota_magic_location_read( $sota_magic_qrz_key );
-        if ( $sota_magic_qrz_row ) {
+    // Priority 3: Check unified cache (any source); also check legacy qrz_ key for existing cached entries
+    $sota_magic_loc_key    = 'loc_' . sanitize_key( strtolower( $sota_magic_callsign ) );
+    $sota_magic_legacy_key = 'qrz_' . sanitize_key( strtolower( $sota_magic_callsign ) );
+    $sota_magic_cached_row = sota_magic_location_read( $sota_magic_loc_key )
+                          ?? sota_magic_location_read( $sota_magic_legacy_key );
+    if ( $sota_magic_cached_row ) {
+        $sota_magic_contact_locations[] = [
+            'callsign'        => $sota_magic_callsign,
+            'lat'             => floatval( $sota_magic_cached_row->lat ),
+            'lon'             => floatval( $sota_magic_cached_row->lon ),
+            'summit'          => '',
+            'mode'            => $sota_magic_contact['mode'],
+            'frequency'       => $sota_magic_contact['frequency'],
+            'is_s2s'          => false,
+            'color'           => $sota_magic_band_color,
+            'location_source' => $sota_magic_cached_row->source,
+            'cached'          => true,
+        ];
+        continue;
+    }
+
+    $sota_magic_fail_reasons = [];
+
+    // Priority 4: Callook.info — free, US callsigns only (FCC data), no auth required
+    $sota_magic_callook_url  = 'https://callook.info/' . rawurlencode( $sota_magic_callsign ) . '/json';
+    $sota_magic_callook_wp   = wp_remote_get( $sota_magic_callook_url, [ 'timeout' => 10, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
+    $sota_magic_callook_body = ! is_wp_error( $sota_magic_callook_wp ) ? wp_remote_retrieve_body( $sota_magic_callook_wp ) : false;
+    if ( $sota_magic_callook_body ) {
+        $sota_magic_callook_data = json_decode( $sota_magic_callook_body, true );
+        if ( isset( $sota_magic_callook_data['status'] ) && $sota_magic_callook_data['status'] === 'VALID'
+             && ! empty( $sota_magic_callook_data['location']['latitude'] )
+             && ! empty( $sota_magic_callook_data['location']['longitude'] ) ) {
+            $sota_magic_callook_lat = floatval( $sota_magic_callook_data['location']['latitude'] );
+            $sota_magic_callook_lon = floatval( $sota_magic_callook_data['location']['longitude'] );
+            sota_magic_location_write( $sota_magic_loc_key, $sota_magic_callook_lat, $sota_magic_callook_lon, $sota_magic_callsign, 'callook', 0 );
             $sota_magic_contact_locations[] = [
                 'callsign'        => $sota_magic_callsign,
-                'lat'             => floatval( $sota_magic_qrz_row->lat ),
-                'lon'             => floatval( $sota_magic_qrz_row->lon ),
+                'lat'             => $sota_magic_callook_lat,
+                'lon'             => $sota_magic_callook_lon,
                 'summit'          => '',
                 'mode'            => $sota_magic_contact['mode'],
                 'frequency'       => $sota_magic_contact['frequency'],
                 'is_s2s'          => false,
                 'color'           => $sota_magic_band_color,
-                'location_source' => 'qrz',
-                'cached'          => true,
+                'location_source' => 'callook',
+                'cached'          => false,
             ];
-        } else {
-            $sota_magic_qrz_url      = 'https://xmldata.qrz.com/xml/current/?s=' . rawurlencode( $sota_magic_qrz_session ) . '&callsign=' . rawurlencode( $sota_magic_callsign );
-            $sota_magic_qrz_wp       = wp_remote_get( $sota_magic_qrz_url, [ 'timeout' => 15, 'user-agent' => 'SOTA-Magic-Plugin/1.0' ] );
-            $sota_magic_qrz_response = ! is_wp_error( $sota_magic_qrz_wp ) ? wp_remote_retrieve_body( $sota_magic_qrz_wp ) : false;
-            if ( $sota_magic_qrz_response ) {
-                preg_match( '/<lat>([^<]+)<\/lat>/', $sota_magic_qrz_response, $sota_magic_lat_match );
-                preg_match( '/<lon>([^<]+)<\/lon>/', $sota_magic_qrz_response, $sota_magic_lon_match );
-                if ( ! empty( $sota_magic_lat_match[1] ) && ! empty( $sota_magic_lon_match[1] ) ) {
-                    $sota_magic_qrz_lat = floatval( $sota_magic_lat_match[1] );
-                    $sota_magic_qrz_lon = floatval( $sota_magic_lon_match[1] );
-                    sota_magic_location_write( $sota_magic_qrz_key, $sota_magic_qrz_lat, $sota_magic_qrz_lon, $sota_magic_callsign, 'qrz', 0 );
-                    $sota_magic_contact_locations[] = [
-                        'callsign'        => $sota_magic_callsign,
-                        'lat'             => $sota_magic_qrz_lat,
-                        'lon'             => $sota_magic_qrz_lon,
-                        'summit'          => '',
-                        'mode'            => $sota_magic_contact['mode'],
-                        'frequency'       => $sota_magic_contact['frequency'],
-                        'is_s2s'          => false,
-                        'color'           => $sota_magic_band_color,
-                        'location_source' => 'qrz',
-                        'cached'          => false,
-                    ];
-                } else {
-                    $sota_magic_unresolved[] = [ 'callsign' => $sota_magic_callsign, 'reason' => 'No coordinates in QRZ response' ];
-                    if ( $sota_magic_debug_mode ) {
-                        $sota_magic_qrz_fail_debug[ $sota_magic_callsign ] = substr( $sota_magic_qrz_response, 0, 1000 );
-                    }
-                }
-            } else {
-                $sota_magic_unresolved[] = [ 'callsign' => $sota_magic_callsign, 'reason' => 'QRZ HTTP request failed' ];
-            }
-            usleep( 500000 ); // Rate limit: 0.5s between QRZ calls (only on cache miss)
+            usleep( 250000 );
+            continue;
         }
+        $sota_magic_fail_reasons[] = 'Callook: not a US callsign';
     } else {
-        $sota_magic_unresolved[] = [ 'callsign' => $sota_magic_callsign, 'reason' => 'No QRZ credentials configured' ];
+        $sota_magic_fail_reasons[] = 'Callook: request failed';
     }
+
+    // Priority 5: HamQTH — free account, international
+    if ( $sota_magic_hamqth_session ) {
+        $sota_magic_hamqth_url      = 'https://www.hamqth.com/xml.php?id=' . rawurlencode( $sota_magic_hamqth_session ) . '&callsign=' . rawurlencode( $sota_magic_callsign ) . '&prg=Activator-Toolkit-for-SOTA';
+        $sota_magic_hamqth_wp       = wp_remote_get( $sota_magic_hamqth_url, [ 'timeout' => 15, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
+        $sota_magic_hamqth_response = ! is_wp_error( $sota_magic_hamqth_wp ) ? wp_remote_retrieve_body( $sota_magic_hamqth_wp ) : false;
+        if ( $sota_magic_hamqth_response ) {
+            preg_match( '/<latitude>([^<]+)<\/latitude>/', $sota_magic_hamqth_response, $sota_magic_hamqth_lat_m );
+            preg_match( '/<longitude>([^<]+)<\/longitude>/', $sota_magic_hamqth_response, $sota_magic_hamqth_lon_m );
+            if ( ! empty( $sota_magic_hamqth_lat_m[1] ) && ! empty( $sota_magic_hamqth_lon_m[1] ) ) {
+                $sota_magic_hamqth_lat = floatval( $sota_magic_hamqth_lat_m[1] );
+                $sota_magic_hamqth_lon = floatval( $sota_magic_hamqth_lon_m[1] );
+                sota_magic_location_write( $sota_magic_loc_key, $sota_magic_hamqth_lat, $sota_magic_hamqth_lon, $sota_magic_callsign, 'hamqth', 0 );
+                $sota_magic_contact_locations[] = [
+                    'callsign'        => $sota_magic_callsign,
+                    'lat'             => $sota_magic_hamqth_lat,
+                    'lon'             => $sota_magic_hamqth_lon,
+                    'summit'          => '',
+                    'mode'            => $sota_magic_contact['mode'],
+                    'frequency'       => $sota_magic_contact['frequency'],
+                    'is_s2s'          => false,
+                    'color'           => $sota_magic_band_color,
+                    'location_source' => 'hamqth',
+                    'cached'          => false,
+                ];
+                usleep( 250000 );
+                continue;
+            }
+            $sota_magic_fail_reasons[] = 'HamQTH: no coordinates in response';
+            if ( $sota_magic_debug_mode ) {
+                $sota_magic_lookup_fail_debug[ $sota_magic_callsign ] = substr( $sota_magic_hamqth_response, 0, 1000 );
+            }
+        } else {
+            $sota_magic_fail_reasons[] = 'HamQTH: request failed';
+        }
+        usleep( 250000 );
+    } else {
+        $sota_magic_fail_reasons[] = 'HamQTH: not configured';
+    }
+
+    // Priority 6: QRZ.com — paid subscription, international
+    if ( $sota_magic_qrz_session ) {
+        $sota_magic_qrz_url      = 'https://xmldata.qrz.com/xml/current/?s=' . rawurlencode( $sota_magic_qrz_session ) . '&callsign=' . rawurlencode( $sota_magic_callsign );
+        $sota_magic_qrz_wp       = wp_remote_get( $sota_magic_qrz_url, [ 'timeout' => 15, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
+        $sota_magic_qrz_response = ! is_wp_error( $sota_magic_qrz_wp ) ? wp_remote_retrieve_body( $sota_magic_qrz_wp ) : false;
+        if ( $sota_magic_qrz_response ) {
+            preg_match( '/<lat>([^<]+)<\/lat>/', $sota_magic_qrz_response, $sota_magic_lat_match );
+            preg_match( '/<lon>([^<]+)<\/lon>/', $sota_magic_qrz_response, $sota_magic_lon_match );
+            if ( ! empty( $sota_magic_lat_match[1] ) && ! empty( $sota_magic_lon_match[1] ) ) {
+                $sota_magic_qrz_lat = floatval( $sota_magic_lat_match[1] );
+                $sota_magic_qrz_lon = floatval( $sota_magic_lon_match[1] );
+                sota_magic_location_write( $sota_magic_loc_key, $sota_magic_qrz_lat, $sota_magic_qrz_lon, $sota_magic_callsign, 'qrz', 0 );
+                $sota_magic_contact_locations[] = [
+                    'callsign'        => $sota_magic_callsign,
+                    'lat'             => $sota_magic_qrz_lat,
+                    'lon'             => $sota_magic_qrz_lon,
+                    'summit'          => '',
+                    'mode'            => $sota_magic_contact['mode'],
+                    'frequency'       => $sota_magic_contact['frequency'],
+                    'is_s2s'          => false,
+                    'color'           => $sota_magic_band_color,
+                    'location_source' => 'qrz',
+                    'cached'          => false,
+                ];
+                usleep( 500000 );
+                continue;
+            }
+            $sota_magic_fail_reasons[] = 'QRZ: no coordinates in response';
+            if ( $sota_magic_debug_mode ) {
+                $sota_magic_lookup_fail_debug[ $sota_magic_callsign ] = substr( $sota_magic_qrz_response, 0, 1000 );
+            }
+        } else {
+            $sota_magic_fail_reasons[] = 'QRZ: request failed';
+        }
+        usleep( 500000 );
+    } else {
+        $sota_magic_fail_reasons[] = 'QRZ: not configured';
+    }
+
+    $sota_magic_unresolved[] = [ 'callsign' => $sota_magic_callsign, 'reason' => implode( '; ', $sota_magic_fail_reasons ) ];
 }
 
 // Build the map data object that contact-map.js reads from window.sotaContactMapData.
@@ -445,10 +541,10 @@ wp_add_inline_script( 'sota-cm-js', 'var sotaContactMapData = ' . wp_json_encode
         &nbsp;• <strong><?php echo esc_html( $sota_magic_ur['callsign'] ); ?></strong> — <?php echo esc_html( $sota_magic_ur['reason'] ); ?><br>
         <?php endforeach; ?>
         <?php endif; ?>
-        <?php if ( ! empty( $sota_magic_qrz_fail_debug ) ) : ?>
+        <?php if ( ! empty( $sota_magic_lookup_fail_debug ) ) : ?>
         <hr style="margin:4px 0;">
-        <strong>QRZ raw responses (failed lookups):</strong><br>
-        <?php foreach ( $sota_magic_qrz_fail_debug as $sota_magic_cs => $sota_magic_raw ) : ?>
+        <strong>Raw lookup responses (failed):</strong><br>
+        <?php foreach ( $sota_magic_lookup_fail_debug as $sota_magic_cs => $sota_magic_raw ) : ?>
         <em><?php echo esc_html( $sota_magic_cs ); ?>:</em><br>
         <pre style="font-size:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto;background:#f8f8f8;padding:4px;"><?php echo esc_html( $sota_magic_raw ); ?></pre>
         <?php endforeach; ?>
