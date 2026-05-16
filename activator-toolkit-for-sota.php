@@ -123,6 +123,7 @@ add_action('admin_init', function() {
         'sota_s2s_highlight'          => [ 'sanitize_hex_color',             '#ffebee' ],
         'sota_s2s_text_color'         => [ 'sanitize_hex_color',             '#d32f2f' ],
         'sota_show_contact_map'       => [ 'absint',                         1 ],
+        'sota_block_width'            => [ 'sanitize_text_field',            '' ],
         'sota_hamqth_username'        => [ 'sanitize_text_field',            '' ],
         'sota_hamqth_password'        => [ 'sota_magic_sanitize_password',   '' ],
         'sota_qrz_username'           => [ 'sanitize_text_field',            '' ],
@@ -167,6 +168,7 @@ function sota_magic_settings_page() {
         update_option('sota_s2s_highlight', sanitize_hex_color(wp_unslash($_POST['sota_s2s_highlight'] ?? '')));
         update_option('sota_s2s_text_color', sanitize_hex_color(wp_unslash($_POST['sota_s2s_text_color'] ?? '')));
         update_option('sota_show_contact_map', isset($_POST['sota_show_contact_map']) ? 1 : 0);
+        update_option('sota_block_width', sanitize_text_field(wp_unslash($_POST['sota_block_width'] ?? '')));
         update_option('sota_hamqth_username', sanitize_text_field(wp_unslash($_POST['sota_hamqth_username'] ?? '')));
         $sota_magic_hamqth_pass = wp_unslash($_POST['sota_hamqth_password'] ?? ''); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- password encrypted immediately
         if (!empty($sota_magic_hamqth_pass)) {
@@ -225,6 +227,16 @@ function sota_magic_settings_page() {
 
                     <tr><th colspan="2"><h2>Contact Map</h2></th></tr>
                     <tr><th>Show Contact Map</th><td><input type="checkbox" name="sota_show_contact_map" value="1" <?php checked(1, get_option('sota_show_contact_map')); ?> /></td></tr>
+
+                    <tr><th colspan="2"><h2>Block Width</h2></th></tr>
+                    <tr><th>Width</th><td>
+                        <select name="sota_block_width">
+                            <option value=""     <?php selected('',     get_option('sota_block_width')); ?>>Follow theme (default)</option>
+                            <option value="wide" <?php selected('wide', get_option('sota_block_width')); ?>>Wide — break out of content column</option>
+                            <option value="full" <?php selected('full', get_option('sota_block_width')); ?>>Full page width</option>
+                        </select>
+                        <br><small>If the block looks too narrow, try <strong>Wide</strong> or <strong>Full page width</strong> to expand beyond the theme's content column. Wide targets ~1200px; Full uses the entire browser window.</small>
+                    </td></tr>
                 </table>
             </div>
 
@@ -1035,6 +1047,7 @@ add_action('init', function() {
         'editor_script'   => 'sota-editor-js',
         'style'           => 'activator-toolkit',
         'render_callback' => 'sota_magic_render_sota_data',
+        'supports'        => [ 'align' => [ 'wide', 'full' ] ],
     ]);
 });
 
@@ -1090,6 +1103,7 @@ add_action('wp_enqueue_scripts', function() {
         .s2s-row td{background:" . esc_attr($s2s_bg) . "!important;color:" . esc_attr($s2s_text) . "!important;}
         .s2s-badge{background:" . esc_attr($s2s_text) . ";}
     ";
+
     wp_add_inline_style( 'activator-toolkit', $dynamic_css );
 });
 
@@ -1445,6 +1459,8 @@ function sota_magic_render_sota_data($atts) {
     $s2s_text = esc_attr(get_option('sota_s2s_text_color'));
     $show_map = get_option('sota_show_contact_map');
     $show_gpx_stats = get_option('sota_show_gpx_stats');
+    $block_width = get_option('sota_block_width', '');
+    $width_class = $block_width === 'wide' ? ' alignwide' : ( $block_width === 'full' ? ' alignfull' : '' );
     $hide_stats_display = !empty($atts['hideGpxStats']);
     $unit_system = get_option('sota_unit_system', 'metric');
 
@@ -1567,7 +1583,7 @@ function sota_magic_render_sota_data($atts) {
 
     ob_start();
     ?>
-    <div class="sota-main-container">
+    <div class="sota-main-container<?php echo esc_attr( $width_class ); ?>">
         <?php if ($gpx_url): ?>
             <h3>🏔️ <?php echo esc_html(get_option('sota_headline_gpx')); ?></h3>
             <?php if (!empty($track_points)): ?>
