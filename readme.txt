@@ -1,4 +1,4 @@
-=== Activator Toolkit for SOTA ===
+=== Activator Toolkit for Summits on the Air (SOTA) ===
 Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
