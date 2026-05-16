@@ -147,7 +147,7 @@ add_action('admin_init', function() {
 function sota_magic_settings_page() {
     if (!current_user_can('manage_options')) return;
 
-    $sota_magic_valid_tabs = ['display', 'lookup', 'gpx', 'developer'];
+    $sota_magic_valid_tabs = ['display', 'lookup', 'gpx', 'developer', 'cache'];
     $sota_current_tab = 'display';
     if (isset($_POST['sota_magic_save'])) {
         $sota_current_tab = sanitize_key($_POST['sota_active_tab'] ?? 'display');
@@ -201,6 +201,7 @@ function sota_magic_settings_page() {
             <a href="#" data-tab="lookup"     class="nav-tab <?php echo $sota_current_tab === 'lookup'     ? 'nav-tab-active' : ''; ?>">Callsign Lookup</a>
             <a href="#" data-tab="gpx"        class="nav-tab <?php echo $sota_current_tab === 'gpx'        ? 'nav-tab-active' : ''; ?>">GPX Track</a>
             <a href="#" data-tab="developer"  class="nav-tab <?php echo $sota_current_tab === 'developer'  ? 'nav-tab-active' : ''; ?>">Developer</a>
+            <a href="#" data-tab="cache"      class="nav-tab <?php echo $sota_current_tab === 'cache'      ? 'nav-tab-active' : ''; ?>">Cache</a>
         </h2>
 
         <form method="post" action="">
@@ -277,12 +278,6 @@ function sota_magic_settings_page() {
                         <br><small>Your QRZ.com password. Leave blank to keep the current saved password.</small>
                     </td></tr>
 
-                    <tr><th colspan="2"><h2>Location Cache</h2></th></tr>
-                    <tr><th>Clear Cached Locations</th><td>
-                        <button type="button" id="sota-clear-cache-btn" class="button button-secondary">Clear All Cached Locations</button>
-                        <p class="description" style="margin-top:6px;color:#c0392b;"><strong>⚠ Nuclear option:</strong> Wipes all cached callsign locations site-wide. The next time any contact map loads, every non-grid, non-S2S contact will trigger a fresh lookup. Only use this if you believe cached locations are incorrect.</p>
-                        <p id="sota-clear-cache-result" style="margin-top:6px;font-weight:bold;display:none;"></p>
-                    </td></tr>
                 </table>
             </div>
 
@@ -353,6 +348,63 @@ function sota_magic_settings_page() {
                 </table>
             </div>
 
+            <!-- Tab: Cache -->
+            <div id="sota-tab-cache" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'cache' ? '' : 'display:none;'; ?>">
+                <?php
+                global $wpdb;
+                $sota_cache_table = $wpdb->prefix . 'sota_magic_locations';
+                // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                $sota_cached_entries = $wpdb->get_results( "SELECT cache_key, lat, lon, source, cached_at FROM $sota_cache_table WHERE source != 'sota' ORDER BY cache_key ASC" );
+                // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                $sota_cache_count = count( $sota_cached_entries );
+                ?>
+                <p style="background:#e8f5e9;padding:10px;border-left:4px solid #28a745;margin:10px 0;">
+                    <strong>&#10003; Changes on this page take effect immediately</strong> &mdash; no Save button needed. Deleting an entry or clearing all cached locations happens the moment you click.
+                </p>
+                <h2>Cached Callsign Locations</h2>
+                <p id="sota-cache-count"><?php echo esc_html( $sota_cache_count ); ?> callsign location(s) cached.</p>
+
+                <?php if ( $sota_cache_count > 0 ) : ?>
+                <p><input type="text" id="sota-cache-search" placeholder="Filter by callsign&hellip;" class="regular-text" autocomplete="off" /></p>
+                <table class="widefat striped" id="sota-cache-table">
+                    <thead>
+                        <tr>
+                            <th>Callsign</th>
+                            <th>Source</th>
+                            <th>Lat / Lon</th>
+                            <th>Cached</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php
+                    $sota_source_labels = [ 'callook' => 'Callook', 'hamqth' => 'HamQTH', 'qrz' => 'QRZ' ];
+                    foreach ( $sota_cached_entries as $sota_entry ) :
+                        $sota_callsign = preg_replace( '/^(loc_|qrz_)/', '', $sota_entry->cache_key );
+                        $sota_cached_date = $sota_entry->cached_at ? gmdate( 'Y-m-d', strtotime( $sota_entry->cached_at ) ) : '—';
+                    ?>
+                        <tr data-callsign="<?php echo esc_attr( strtolower( $sota_callsign ) ); ?>">
+                            <td><strong><?php echo esc_html( strtoupper( $sota_callsign ) ); ?></strong></td>
+                            <td><?php echo esc_html( $sota_source_labels[ $sota_entry->source ] ?? $sota_entry->source ); ?></td>
+                            <td><?php echo esc_html( number_format( (float) $sota_entry->lat, 4 ) ); ?>, <?php echo esc_html( number_format( (float) $sota_entry->lon, 4 ) ); ?></td>
+                            <td><?php echo esc_html( $sota_cached_date ); ?></td>
+                            <td><button type="button" class="button button-small sota-delete-cache-entry" data-cache-key="<?php echo esc_attr( $sota_entry->cache_key ); ?>">Delete</button></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <p id="sota-no-cache-results" style="display:none;color:#999;margin-top:6px;">No entries match your filter.</p>
+                <?php else : ?>
+                <p style="color:#999;">No callsign locations are currently cached.</p>
+                <?php endif; ?>
+
+                <hr style="margin:30px 0;">
+                <h2>Clear All Cached Locations</h2>
+                <p class="description" style="color:#c0392b;margin-bottom:10px;"><strong>&#9888; Nuclear option:</strong> Wipes all cached callsign locations site-wide. The next time any contact map loads, every non-grid, non-S2S contact will trigger a fresh lookup. Only use this if you believe cached locations are incorrect.</p>
+                <button type="button" id="sota-clear-cache-btn" class="button button-secondary">Clear All Cached Locations</button>
+                <p id="sota-clear-cache-result" style="margin-top:6px;font-weight:bold;display:none;"></p>
+            </div>
+
             <?php submit_button('Save Settings', 'primary', 'sota_magic_save'); ?>
         </form>
     </div>
@@ -360,6 +412,11 @@ function sota_magic_settings_page() {
     document.addEventListener('DOMContentLoaded', function() {
         var tabs = document.querySelectorAll('.nav-tab[data-tab]');
         var activeInput = document.getElementById('sota_active_tab');
+        var submitRow = document.querySelector('p.submit');
+        function toggleSubmit(tabName) {
+            if (submitRow) submitRow.style.display = tabName === 'cache' ? 'none' : '';
+        }
+        toggleSubmit(activeInput ? activeInput.value : 'display');
         tabs.forEach(function(tab) {
             tab.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -369,6 +426,7 @@ function sota_magic_settings_page() {
                 this.classList.add('nav-tab-active');
                 document.querySelectorAll('.sota-tab-panel').forEach(function(p) { p.style.display = 'none'; });
                 document.getElementById('sota-tab-' + t).style.display = '';
+                toggleSubmit(t);
             });
         });
     });
@@ -1064,6 +1122,20 @@ add_action('wp_ajax_sota_magic_clear_location_cache', function() {
     wp_send_json_success($count . ' cached location(s) cleared. Fresh lookups will run on next map load.');
 });
 
+// AJAX: Delete a single callsign location from cache
+add_action('wp_ajax_sota_magic_delete_single_location', function() {
+    check_ajax_referer('sota_magic_delete_single_location');
+    if (!current_user_can('manage_options')) wp_send_json_error('Unauthorized.');
+    $cache_key = isset($_POST['cache_key']) ? sanitize_text_field(wp_unslash($_POST['cache_key'])) : '';
+    if (!$cache_key || !preg_match('/^(loc_|qrz_)/', $cache_key)) wp_send_json_error('Invalid cache key.');
+    global $wpdb;
+    $table = $wpdb->prefix . 'sota_magic_locations';
+    // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery
+    $wpdb->delete($table, ['cache_key' => $cache_key], ['%s']);
+    // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery
+    wp_send_json_success('Deleted.');
+});
+
 // AJAX: Serve the contact map iframe page
 function sota_magic_render_contact_map_ajax() {
     if ( ! isset( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_nonce'] ) ), 'sota_magic_contact_map' ) ) {
@@ -1397,30 +1469,99 @@ add_action( 'admin_enqueue_scripts', function( $hook ) {
     if ( $hook !== 'settings_page_activator-toolkit-settings' ) return;
     wp_register_script( 'sota-settings-js', '', [], '1.0.0', true );
     wp_localize_script( 'sota-settings-js', 'sotaMagicSettings', [
-        'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-        'nonce'   => wp_create_nonce( 'sota_magic_clear_location_cache' ),
+        'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+        'nonce'       => wp_create_nonce( 'sota_magic_clear_location_cache' ),
+        'deleteNonce' => wp_create_nonce( 'sota_magic_delete_single_location' ),
     ] );
     wp_add_inline_script( 'sota-settings-js', "
         document.addEventListener('DOMContentLoaded', function() {
+            // Clear all button
             var btn = document.getElementById('sota-clear-cache-btn');
             var result = document.getElementById('sota-clear-cache-result');
-            if (!btn) return;
-            btn.addEventListener('click', function() {
-                btn.disabled = true;
-                btn.textContent = 'Clearing\u2026';
-                result.style.display = 'none';
+            if (btn) {
+                btn.addEventListener('click', function() {
+                    if (!confirm('Clear all cached callsign locations? This cannot be undone.')) return;
+                    btn.disabled = true;
+                    btn.textContent = 'Clearing\u2026';
+                    result.style.display = 'none';
+                    fetch(sotaMagicSettings.ajaxUrl, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: 'action=sota_magic_clear_location_cache&_ajax_nonce=' + sotaMagicSettings.nonce
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        result.style.display = 'block';
+                        result.style.color   = data.success ? '#28a745' : '#c0392b';
+                        result.textContent   = data.success ? '\u2713 ' + data.data : '\u2717 Error clearing cache';
+                        btn.textContent = 'Clear All Cached Locations';
+                        btn.disabled = false;
+                        if (data.success) {
+                            var tbody = document.querySelector('#sota-cache-table tbody');
+                            if (tbody) tbody.innerHTML = '';
+                            var table = document.getElementById('sota-cache-table');
+                            if (table) table.style.display = 'none';
+                            var searchEl = document.getElementById('sota-cache-search');
+                            if (searchEl) searchEl.closest('p').style.display = 'none';
+                            var countEl = document.getElementById('sota-cache-count');
+                            if (countEl) countEl.textContent = '0 callsign location(s) cached.';
+                        }
+                    });
+                });
+            }
+
+            // Search/filter
+            var searchInput = document.getElementById('sota-cache-search');
+            var cacheTable  = document.getElementById('sota-cache-table');
+            var noResults   = document.getElementById('sota-no-cache-results');
+            if (searchInput && cacheTable) {
+                searchInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') e.preventDefault();
+                });
+                searchInput.addEventListener('input', function() {
+                    var q = this.value.toLowerCase().trim();
+                    var rows = cacheTable.querySelectorAll('tbody tr');
+                    var visible = 0;
+                    rows.forEach(function(row) {
+                        var cs = row.dataset.callsign || '';
+                        var show = !q || cs.indexOf(q) !== -1;
+                        row.style.display = show ? '' : 'none';
+                        if (show) visible++;
+                    });
+                    if (noResults) noResults.style.display = visible === 0 ? '' : 'none';
+                });
+            }
+
+            // Delete single entry (event delegation)
+            document.addEventListener('click', function(e) {
+                if (!e.target.classList.contains('sota-delete-cache-entry')) return;
+                var delBtn  = e.target;
+                var row     = delBtn.closest('tr');
+                var key     = delBtn.dataset.cacheKey;
+                delBtn.disabled = true;
+                delBtn.textContent = 'Deleting\u2026';
                 fetch(sotaMagicSettings.ajaxUrl, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'action=sota_magic_clear_location_cache&_ajax_nonce=' + sotaMagicSettings.nonce
+                    body: 'action=sota_magic_delete_single_location&_ajax_nonce=' + sotaMagicSettings.deleteNonce + '&cache_key=' + encodeURIComponent(key)
                 })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
-                    result.style.display = 'block';
-                    result.style.color   = data.success ? '#28a745' : '#c0392b';
-                    result.textContent   = data.success ? '\u2713 ' + data.data : '\u2717 Error clearing cache';
-                    btn.textContent = 'Clear All Cached Locations';
-                    btn.disabled = false;
+                    if (data.success) {
+                        row.remove();
+                        var countEl = document.getElementById('sota-cache-count');
+                        if (countEl) {
+                            var n = parseInt(countEl.textContent, 10);
+                            if (!isNaN(n)) countEl.textContent = (n - 1) + ' callsign location(s) cached.';
+                        }
+                        var tbody = document.querySelector('#sota-cache-table tbody');
+                        if (tbody && tbody.querySelectorAll('tr:not([style*=\"none\"])').length === 0) {
+                            if (noResults) { noResults.style.display = ''; noResults.textContent = 'No entries match your filter.'; }
+                        }
+                    } else {
+                        delBtn.disabled = false;
+                        delBtn.textContent = 'Delete';
+                    }
                 });
             });
         });
