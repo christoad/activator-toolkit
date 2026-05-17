@@ -3,7 +3,7 @@
  * Plugin Name: Activator Toolkit for Summits on the Air (SOTA)
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
@@ -104,6 +104,104 @@ function sota_magic_sanitize_map_layer( $value ) {
 }
 function sota_magic_sanitize_password( $value ) {
     return $value; // stored encrypted; do not alter via settings API
+}
+
+/**
+ * Returns a minimal inline SVG icon by name.
+ * All icons: 24×24 viewBox, stroke-based, inherits currentColor.
+ *
+ * @param string $name  Icon slug (mountain|hike|radio|timer|trend-up|walk|peak|
+ *                      pause|chart|pin|map|antenna|home|warning|info|gear|distance).
+ * @param int    $size  Rendered px size (default 20).
+ * @return string       SVG markup — not user-supplied; safe to echo unescaped.
+ */
+function sota_magic_svg_icon( $name, $size = 20 ) {
+    $s   = (int) $size;
+    $att = 'width="' . $s . '" height="' . $s . '" viewBox="0 0 24 24" fill="none" '
+         . 'stroke="currentColor" stroke-width="1.75" stroke-linecap="round" '
+         . 'stroke-linejoin="round" style="vertical-align:middle;flex-shrink:0;" '
+         . 'aria-hidden="true"';
+    $icons = [
+        'mountain'  => '<path d="M3 20L12 4L21 20H3Z"/><path d="M9 20L12 13L15 17"/>',
+        'hike'      => '<circle cx="12" cy="4" r="1.5" fill="currentColor" stroke="none"/>'
+                     . '<line x1="12" y1="5.5" x2="11" y2="13"/>'
+                     . '<rect x="8" y="5.5" width="3.5" height="5.5" rx="1"/>'
+                     . '<line x1="16" y1="7" x2="18" y2="22"/>'
+                     . '<line x1="11" y1="9" x2="16" y2="8"/>'
+                     . '<line x1="11" y1="13" x2="8" y2="22"/>'
+                     . '<line x1="11" y1="13" x2="14" y2="22"/>',        // hiker with backpack + walking stick
+        'radio'     => '<rect x="7" y="8" width="8" height="13" rx="2"/>'
+                     . '<line x1="12" y1="8" x2="12" y2="3"/>'
+                     . '<rect x="9" y="10" width="4" height="3" rx="0.5"/>'
+                     . '<circle cx="11" cy="17" r="1.5" fill="currentColor" stroke="none"/>',  // walkie-talkie, vertical antenna
+        'timer'     => '<circle cx="12" cy="13" r="7"/>'
+                     . '<path d="M12 10v3.5l2 2"/>'
+                     . '<line x1="9" y1="3" x2="15" y2="3"/>'
+                     . '<line x1="12" y1="6" x2="12" y2="3"/>',
+        'trend-up'  => '<polyline points="22,7 13,16 8,11 2,17"/>'
+                     . '<polyline points="17,7 22,7 22,12"/>',
+        'walk'      => '<path d="M5 17A7 7 0 1 1 19 17"/>'
+                     . '<path d="M12 17L9 12"/>'
+                     . '<circle cx="12" cy="17" r="1.2" fill="currentColor" stroke="none"/>'
+                     . '<line x1="5" y1="17" x2="7" y2="17"/>'
+                     . '<line x1="12" y1="10" x2="12" y2="12"/>'
+                     . '<line x1="19" y1="17" x2="17" y2="17"/>',          // speedometer gauge
+        'peak'      => '<path d="M2 20L8 9L12 15L16 7L22 20H2Z"/>',            // double-mountain silhouette
+        'pause'     => '<rect x="6" y="4" width="4" height="16" rx="1"/>'
+                     . '<rect x="14" y="4" width="4" height="16" rx="1"/>',
+        'chart'     => '<line x1="2" y1="20" x2="22" y2="20"/>'
+                     . '<rect x="4" y="12" width="4" height="8"/>'
+                     . '<rect x="10" y="7" width="4" height="13"/>'
+                     . '<rect x="16" y="4" width="4" height="16"/>',
+        'pin'       => '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z"/>'
+                     . '<circle cx="12" cy="10" r="3"/>',
+        'map'       => '<polygon points="1,6 1,22 8,18 16,22 23,18 23,2 16,6 8,2"/>'
+                     . '<line x1="8" y1="2" x2="8" y2="18"/>'
+                     . '<line x1="16" y1="6" x2="16" y2="22"/>',
+        'antenna'   => '<circle cx="12" cy="8" r="1.5" fill="currentColor" stroke="none"/>'
+                     . '<line x1="12" y1="9.5" x2="7" y2="22"/>'
+                     . '<line x1="12" y1="9.5" x2="17" y2="22"/>'
+                     . '<line x1="10" y1="14" x2="14" y2="14"/>'
+                     . '<line x1="9" y1="19" x2="15" y2="19"/>'
+                     . '<line x1="10" y1="14" x2="15" y2="19"/>'
+                     . '<line x1="14" y1="14" x2="9" y2="19"/>'
+                     . '<path d="M8.5 6 A 3 3 0 0 0 8.5 10.5"/>'
+                     . '<path d="M7.5 4.5 A 4 4 0 0 0 7.5 12"/>'
+                     . '<path d="M15.5 6 A 3 3 0 0 1 15.5 10.5"/>'
+                     . '<path d="M16.5 4.5 A 4 4 0 0 1 16.5 12"/>',       // broadcast tower: clean A-frame + C-arcs
+        'home'      => '<path d="M3 9.5L12 3L21 9.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/>'
+                     . '<path d="M9 21V12h6v9"/>',
+        'warning'   => '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>'
+                     . '<line x1="12" y1="9" x2="12" y2="13"/>'
+                     . '<line x1="12" y1="17" x2="12.01" y2="17"/>',
+        'info'      => '<circle cx="12" cy="12" r="10"/>'
+                     . '<line x1="12" y1="16" x2="12" y2="12"/>'
+                     . '<line x1="12" y1="8" x2="12.01" y2="8"/>',
+        'gear'      => '<circle cx="12" cy="12" r="3"/>'
+                     . '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06'
+                     . 'a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09'
+                     . 'A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83'
+                     . 'l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09'
+                     . 'A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83'
+                     . 'l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09'
+                     . 'a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83'
+                     . 'l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09'
+                     . 'a1.65 1.65 0 0 0-1.51 1z"/>',
+        'distance'  => '<line x1="3" y1="12" x2="21" y2="12"/>'
+                     . '<polyline points="16,7 21,12 16,17"/>'
+                     . '<polyline points="8,7 3,12 8,17"/>',
+    ];
+    $inner = isset( $icons[ $name ] ) ? $icons[ $name ] : '';
+    if ( '' === $inner ) return '';
+    return '<svg ' . $att . '>' . $inner . '</svg>';
+}
+
+/**
+ * Outputs an SVG icon. Thin wrapper around sota_magic_svg_icon() so call sites
+ * don't each need a phpcs:ignore — output is hardcoded, no user input involved.
+ */
+function sota_magic_echo_svg( $name, $size = 20 ) {
+    echo sota_magic_svg_icon( $name, $size ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- hardcoded SVG, no user input
 }
 
 // SETTINGS
@@ -354,10 +452,12 @@ function sota_magic_settings_page() {
                 global $wpdb;
                 $sota_cache_table = $wpdb->prefix . 'sota_magic_locations';
                 // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-                $sota_cached_entries = $wpdb->get_results( "SELECT cache_key, lat, lon, source, cached_at FROM $sota_cache_table WHERE source != 'sota' ORDER BY cache_key ASC" );
+                $sota_cache_table_safe = esc_sql( $sota_cache_table );
+                $sota_cached_entries = $wpdb->get_results( "SELECT cache_key, lat, lon, source, cached_at FROM {$sota_cache_table_safe} WHERE source != 'sota' ORDER BY cache_key ASC" ); // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name sanitized via esc_sql()
                 // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                 $sota_cache_count = count( $sota_cached_entries );
                 ?>
+                <p style="margin:12px 0 16px;">When your contact map loads, the plugin looks up each callsign&rsquo;s location via QRZ, Callook, or HamQTH and stores the result locally. This means each callsign is only ever looked up once &mdash; subsequent map loads are instant and don&rsquo;t count against your API quota. Locations are cached permanently so the map reflects where each station was at the time of your activation, even if they&rsquo;ve moved since.</p>
                 <p style="background:#e8f5e9;padding:10px;border-left:4px solid #28a745;margin:10px 0;">
                     <strong>&#10003; Changes on this page take effect immediately</strong> &mdash; no Save button needed. Deleting an entry or clearing all cached locations happens the moment you click.
                 </p>
@@ -1130,9 +1230,9 @@ add_action('wp_ajax_sota_magic_delete_single_location', function() {
     if (!$cache_key || !preg_match('/^(loc_|qrz_)/', $cache_key)) wp_send_json_error('Invalid cache key.');
     global $wpdb;
     $table = $wpdb->prefix . 'sota_magic_locations';
-    // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery
+    // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
     $wpdb->delete($table, ['cache_key' => $cache_key], ['%s']);
-    // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery
+    // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
     wp_send_json_success('Deleted.');
 });
 
@@ -1213,8 +1313,8 @@ add_action('enqueue_block_editor_assets', function() {
                 return wp.element.createElement('div', {
                     style:{padding:'25px', background:'\\x23f5f5f5', border:'2px dashed \\x230073aa', borderRadius:'8px', textAlign:'center'}
                 },
-                    wp.element.createElement('h3', {style:{margin:'0 0 10px 0', color:'\\x230073aa'}}, '🏔️ SOTA Activator Toolkit'),
-                    wp.element.createElement('p', {style:{color:'\\x23d32f2f', fontWeight:'bold', margin:'0 0 10px 0'}}, '⚠️ Map and table visible in Preview only'),
+                    wp.element.createElement('h3', {style:{margin:'0 0 10px 0', color:'\\x230073aa'}}, 'SOTA Activator Toolkit'),
+                    wp.element.createElement('p', {style:{color:'\\x23d32f2f', fontWeight:'bold', margin:'0 0 10px 0'}}, 'Map and table visible in Preview only'),
                     wp.element.createElement('p', {style:{color:'\\x23666', fontSize:'13px', marginBottom:'16px'}}, 'Settings → Activator Toolkit for SOTA to customize colors, units, and more.'),
                     wp.element.createElement('div', {style:{textAlign:'left', marginBottom:'16px'}},
                         wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px'}},
@@ -1261,12 +1361,12 @@ add_action('enqueue_block_editor_assets', function() {
                         }, 'ℹ️ How are statistics calculated?')
                     ),
                     showModal && wp.element.createElement(wp.components.Modal, {
-                        title: '📊 How Statistics Are Calculated',
+                        title: 'How Statistics Are Calculated',
                         onRequestClose: function() { setShowModal(false); }
                     },
                         wp.element.createElement('div', {style:{fontSize:'13px', lineHeight:'1.65', color:'\\x23333333', maxWidth:'500px'}},
 
-                            wp.element.createElement('h3', {style:{marginTop:'0', marginBottom:'6px', color:'\\x230073aa', fontSize:'14px'}}, '📍 Activation Zone'),
+                            wp.element.createElement('h3', {style:{marginTop:'0', marginBottom:'6px', color:'\\x230073aa', fontSize:'14px'}}, 'Activation Zone'),
                             wp.element.createElement('p', {style:{marginTop:'0'}}, 'The activation zone boundary is the foundation — all time stats depend on it. Here is how it is determined, in order:'),
                             wp.element.createElement('ol', {style:{paddingLeft:'18px', margin:'6px 0 0 0'}},
                                 wp.element.createElement('li', {style:{marginBottom:'5px'}}, wp.element.createElement('strong', null, 'Summit reference'), ' is read from your CSV file (e.g. W6/CT-001).'),
@@ -1277,14 +1377,14 @@ add_action('enqueue_block_editor_assets', function() {
 
                             wp.element.createElement('hr', {style:{border:'none', borderTop:'1px solid \\x23eeeeee', margin:'14px 0'}}),
 
-                            wp.element.createElement('h3', {style:{margin:'0 0 8px 0', color:'\\x230073aa', fontSize:'14px'}}, '⏱️ Time Statistics'),
+                            wp.element.createElement('h3', {style:{margin:'0 0 8px 0', color:'\\x230073aa', fontSize:'14px'}}, 'Time Statistics'),
                             wp.element.createElement('p', {style:{margin:'0 0 6px 0'}}, wp.element.createElement('strong', null, 'Activation Time: '), 'All time spent inside the activation zone — whether you are moving around the summit, setting up, or operating.'),
                             wp.element.createElement('p', {style:{margin:'0 0 6px 0'}}, wp.element.createElement('strong', null, 'Hiking Time: '), 'All time spent outside the zone. Rest breaks are included and shown as a sub-note under hiking time.'),
                             wp.element.createElement('p', {style:{margin:'0'}}, wp.element.createElement('strong', null, 'Total Time: '), 'Elapsed time from the first to the last GPS trackpoint.'),
 
                             wp.element.createElement('hr', {style:{border:'none', borderTop:'1px solid \\x23eeeeee', margin:'14px 0'}}),
 
-                            wp.element.createElement('h3', {style:{margin:'0 0 8px 0', color:'\\x230073aa', fontSize:'14px'}}, '🔧 Why Stats Might Look Wrong'),
+                            wp.element.createElement('h3', {style:{margin:'0 0 8px 0', color:'\\x230073aa', fontSize:'14px'}}, 'Why Stats Might Look Wrong'),
                             wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
                                 wp.element.createElement('strong', null, 'Activation time is 0 or missing'), ' — The plugin could not locate the activation zone. Check that your CSV file includes a valid summit reference. Turn on Debug Mode in Settings → Activator Toolkit for SOTA for details.'
                             ),
@@ -1307,9 +1407,9 @@ add_action('enqueue_block_editor_assets', function() {
                             style:{width:'16px',height:'16px',cursor:'pointer',flexShrink:'0'}}),
                         wp.element.createElement('label', {htmlFor:'hideGpxStats', style:{fontSize:'13px', fontWeight:'700', cursor:'pointer',
                             color: props.attributes.hideGpxStats ? '\\x23856404' : '\\x23333333', fontFamily:'sans-serif', lineHeight:'1.4'}},
-                            props.attributes.hideGpxStats ? '⛔ GPX hike statistics hidden from post' : 'Hide GPX hike statistics from post')
+                            props.attributes.hideGpxStats ? '(hidden) GPX hike statistics' : 'Hide GPX hike statistics from post')
                     ),
-                    wp.element.createElement(wp.components.PanelBody, {title:'⚙️ Statistics Overrides', initialOpen:false},
+                    wp.element.createElement(wp.components.PanelBody, {title:'Statistics Overrides', initialOpen:false},
                         wp.element.createElement('p', {style:{fontSize:'12px', color:'\\x23555555', marginTop:'0', marginBottom:'12px', lineHeight:'1.5'}},
                             'Check the box next to a field to enable that override. Leave unchecked to use the GPX-calculated value.'
                         ),
@@ -1328,7 +1428,7 @@ add_action('enqueue_block_editor_assets', function() {
                                 wp.element.createElement('div', {style:{display:'table-cell', verticalAlign:'middle',
                                     fontSize:'12px', color: props.attributes.forceRadiusZone ? '\\x23c05000' : '\\x23555555',
                                     fontStyle: props.attributes.forceRadiusZone ? 'normal' : 'italic', fontFamily:'sans-serif'}},
-                                    props.attributes.forceRadiusZone ? '📍 Radius-based (API skipped)' : 'Using API / plugin default'
+                                    props.attributes.forceRadiusZone ? 'Radius-based (API skipped)' : 'Using API / plugin default'
                                 )
                             )
                         ),
@@ -1454,7 +1554,7 @@ add_action('enqueue_block_editor_assets', function() {
                             )
                         ),
                         wp.element.createElement('p', {style:{fontSize:'11px', color:'\\x23888888', fontFamily:'sans-serif', margin:'16px 0 0', paddingTop:'12px', borderTop:'1px solid \\x23e0e0e0'}},
-                            '🗺️ To clear cached contact locations, go to Settings → Activator Toolkit for SOTA → Callsign Lookup.'
+                            'To clear cached contact locations, go to Settings → Activator Toolkit for SOTA → Callsign Lookup.'
                         )
                     )
                 );
@@ -1726,7 +1826,7 @@ function sota_magic_render_sota_data($atts) {
     ?>
     <div class="sota-main-container<?php echo esc_attr( $width_class ); ?>">
         <?php if ($gpx_url): ?>
-            <h3>🏔️ <?php echo esc_html(get_option('sota_headline_gpx')); ?></h3>
+            <h3><?php sota_magic_echo_svg('mountain', 22); ?> <?php echo esc_html(get_option('sota_headline_gpx')); ?></h3>
             <?php if (!empty($track_points)): ?>
             <div id="<?php echo esc_attr($map_id); ?>" class="sota-gpx-map"></div>
             <div class="sota-gpx-chart-wrap">
@@ -1740,12 +1840,12 @@ function sota_magic_render_sota_data($atts) {
                 <div class="sota-stats-header">
                     <span class="sota-stats-header-label">Hike Statistics</span>
                     <button class="sota-help-btn" onclick="document.getElementById('sota-stats-modal').classList.add('sota-modal-open')">
-                        ℹ️ How is this calculated?
+                        <?php sota_magic_echo_svg('info', 13); ?> How is this calculated?
                     </button>
                 </div>
                 <div class="sota-gpx-stats">
                     <div class="sota-stat-box">
-                        <div class="sota-stat-icon">🥾</div>
+                        <div class="sota-stat-icon"><?php sota_magic_echo_svg('hike', 30); ?></div>
                         <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_time_duration($gpx_stats['hiking_time'])); ?></div>
                         <div class="sota-stat-label">Hiking Time</div>
                         <div class="sota-stat-secondary">
@@ -1757,7 +1857,7 @@ function sota_magic_render_sota_data($atts) {
                     </div>
 
                     <div class="sota-stat-box">
-                        <div class="sota-stat-icon">📻</div>
+                        <div class="sota-stat-icon"><?php sota_magic_echo_svg('radio', 30); ?></div>
                         <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_time_duration($gpx_stats['stationary_time'])); ?></div>
                         <div class="sota-stat-label">Activation Time</div>
                         <div class="sota-stat-secondary">
@@ -1770,28 +1870,28 @@ function sota_magic_render_sota_data($atts) {
                     </div>
 
                     <div class="sota-stat-box">
-                        <div class="sota-stat-icon">⏱️</div>
+                        <div class="sota-stat-icon"><?php sota_magic_echo_svg('timer', 30); ?></div>
                         <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_time_duration($gpx_stats['total_time'])); ?></div>
                         <div class="sota-stat-label">Total Time</div>
                         <div class="sota-stat-secondary"><?php echo esc_html(sota_magic_format_distance($gpx_stats['total_distance'], $unit_system)); ?></div>
                     </div>
 
                     <div class="sota-stat-box">
-                        <div class="sota-stat-icon">📈</div>
+                        <div class="sota-stat-icon"><?php sota_magic_echo_svg('trend-up', 30); ?></div>
                         <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_elevation($gpx_stats['elevation_gain'], $unit_system)); ?></div>
                         <div class="sota-stat-label">Elevation Gain</div>
                         <div class="sota-stat-secondary">↓ <?php echo esc_html(sota_magic_format_elevation($gpx_stats['elevation_loss'], $unit_system)); ?> loss</div>
                     </div>
 
                     <div class="sota-stat-box">
-                        <div class="sota-stat-icon">🚶</div>
+                        <div class="sota-stat-icon"><?php sota_magic_echo_svg('walk', 30); ?></div>
                         <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_speed($gpx_stats['hiking_speed'], $unit_system)); ?></div>
                         <div class="sota-stat-label">Hiking Speed</div>
                         <div class="sota-stat-secondary">average</div>
                     </div>
 
                     <div class="sota-stat-box">
-                        <div class="sota-stat-icon">⛰️</div>
+                        <div class="sota-stat-icon"><?php sota_magic_echo_svg('peak', 30); ?></div>
                         <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_elevation($gpx_stats['max_elevation'], $unit_system)); ?></div>
                         <div class="sota-stat-label">Peak Elevation</div>
                         <div class="sota-stat-secondary"><?php echo esc_html(sota_magic_format_elevation($gpx_stats['min_elevation'], $unit_system)); ?> base</div>
@@ -1814,47 +1914,47 @@ function sota_magic_render_sota_data($atts) {
                 <div id="sota-stats-modal" class="sota-modal-backdrop" onclick="if(event.target===this)this.classList.remove('sota-modal-open')">
                     <div class="sota-modal" role="dialog" aria-modal="true" aria-labelledby="sota-modal-title">
                         <button class="sota-modal-close" onclick="document.getElementById('sota-stats-modal').classList.remove('sota-modal-open')" aria-label="Close">✕</button>
-                        <h2 id="sota-modal-title">📊 How Hike Stats Are Calculated</h2>
+                        <h2 id="sota-modal-title"><?php sota_magic_echo_svg('chart', 20); ?> How Hike Stats Are Calculated</h2>
                         <p class="sota-modal-subtitle">These figures are derived automatically from your GPX track file.</p>
 
                         <div class="sota-modal-section">
-                            <h3>🥾 Hiking Time &amp; Distance</h3>
+                            <h3><?php sota_magic_echo_svg('hike', 17); ?> Hiking Time &amp; Distance</h3>
                             <p>Time and distance accumulated while <strong>moving outside the activation zone</strong> at a speed above the stationary threshold (default 0.3 km/h). Periods where you were stopped — waiting at a trailhead, taking a break — are excluded and counted separately as Rest Breaks.</p>
                         </div>
 
                         <div class="sota-modal-section">
-                            <h3>⏸️ Rest Breaks</h3>
+                            <h3><?php sota_magic_echo_svg('pause', 17); ?> Rest Breaks</h3>
                             <p>Stationary periods <strong>outside the activation zone</strong> lasting longer than the rest threshold (default 3 minutes). Anything shorter is ignored as normal GPS noise or a momentary pause. Rest break time is shown inside the Hiking Time box for reference but is <em>not</em> added to hiking time.</p>
                         </div>
 
                         <div class="sota-modal-section">
-                            <h3>📻 Activation Time</h3>
+                            <h3><?php sota_magic_echo_svg('radio', 17); ?> Activation Time</h3>
                             <p><strong>All time spent inside the activation zone</strong>, regardless of whether you were moving or stationary. This captures the full period from when you first entered the zone to when you left — including any walking around the summit, setting up gear, and operating.</p>
                             <p>The activation zone boundary is determined by one of two methods (see below).</p>
                         </div>
 
                         <div class="sota-modal-section">
-                            <h3>⏱️ Total Time</h3>
+                            <h3><?php sota_magic_echo_svg('timer', 17); ?> Total Time</h3>
                             <p>The elapsed time from the <strong>first to the last GPS trackpoint</strong> in the file. This equals Hiking Time + Activation Time + Rest Breaks + any unclassified transition time at the boundaries.</p>
                         </div>
 
                         <div class="sota-modal-section">
-                            <h3>📈 Elevation Gain &amp; Loss</h3>
+                            <h3><?php sota_magic_echo_svg('trend-up', 17); ?> Elevation Gain &amp; Loss</h3>
                             <p>The <strong>cumulative</strong> altitude gained and lost across all trackpoints. Each uphill step between consecutive points adds to gain; each downhill step adds to loss. Out-and-back routes will show roughly equal gain and loss.</p>
                         </div>
 
                         <div class="sota-modal-section">
-                            <h3>🚶 Hiking Speed</h3>
+                            <h3><?php sota_magic_echo_svg('walk', 17); ?> Hiking Speed</h3>
                             <p>Average speed calculated as <strong>Hiking Distance ÷ Hiking Time</strong>. Only moving segments outside the activation zone are included, so rest stops and summit time do not drag the average down.</p>
                         </div>
 
                         <div class="sota-modal-section">
-                            <h3>⛰️ Peak &amp; Base Elevation</h3>
+                            <h3><?php sota_magic_echo_svg('peak', 17); ?> Peak &amp; Base Elevation</h3>
                             <p>The <strong>highest and lowest elevation values</strong> recorded in the GPS track. The highest point is also used as the starting reference for the activation zone when the API method is used.</p>
                         </div>
 
                         <div class="sota-modal-section">
-                            <h3>📍 Activation Zone Methods</h3>
+                            <h3><?php sota_magic_echo_svg('pin', 17); ?> Activation Zone Methods</h3>
                             <?php if ($gpx_stats['using_api']): ?>
                             <p><strong>API-based zone (currently active):</strong> The boundary is retrieved from <a href="https://activation.zone" target="_blank" style="color:#0073aa;">activation.zone</a> using Digital Elevation Model (DEM) terrain data and the official SOTA rule — the zone extends to where the terrain drops 25 metres below the summit. This is the most accurate method and matches what SOTA adjudicators use.</p>
                             <?php else: ?>
@@ -1864,7 +1964,7 @@ function sota_magic_render_sota_data($atts) {
                         </div>
 
                         <div class="sota-modal-note">
-                            ⚙️ The stationary speed threshold, rest break minimum duration, activation zone radius, and unit system (metric/imperial) can all be tuned in <strong>Settings → Activator Toolkit for SOTA</strong>. If any values look wrong, the Manual Overrides on the Activator Toolkit block let you correct individual figures without re-uploading files.
+                            <?php sota_magic_echo_svg('gear', 14); ?> The stationary speed threshold, rest break minimum duration, activation zone radius, and unit system (metric/imperial) can all be tuned in <strong>Settings → Activator Toolkit for SOTA</strong>. If any values look wrong, the Manual Overrides on the Activator Toolkit block let you correct individual figures without re-uploading files.
                         </div>
                     </div>
                 </div>
@@ -1873,7 +1973,7 @@ function sota_magic_render_sota_data($atts) {
                 <!-- Debug info -->
                 <?php if (get_option('sota_debug_mode_public') || (get_option('sota_debug_mode') && current_user_can('manage_options'))): ?>
                 <div style="margin-top:10px; padding:10px; background:#fff3cd; border:1px solid #ffc107; border-radius:5px; font-size:12px; font-family:monospace;">
-                    <strong>🔍 Debug Info:</strong><br>
+                    <strong>Debug Info:</strong><br>
                     API Enabled: <?php echo get_option('sota_use_azapi') ? 'YES' : 'NO'; ?><br>
                     CSV URL: <?php echo $csv_url ? 'Present' : 'Missing'; ?><br>
                     Summit Reference: <?php echo esc_html(isset($gpx_stats['summit_ref']) ? $gpx_stats['summit_ref'] : 'Not extracted'); ?><br>
@@ -1900,7 +2000,7 @@ function sota_magic_render_sota_data($atts) {
         <?php endif; ?>
 
         <?php if ($map_iframe_url): ?>
-            <h3 style="margin-top:40px;">🗺️ <?php echo esc_html(get_option('sota_headline_map')); ?></h3>
+            <h3 style="margin-top:40px;"><?php sota_magic_echo_svg('map', 22); ?> <?php echo esc_html(get_option('sota_headline_map')); ?></h3>
             <iframe src="<?php echo esc_url($map_iframe_url); ?>" 
                     style="width:100%; height:500px; border:none; border-radius:8px; background:#f5f5f5;" 
                     title="Contact Map">
@@ -1908,7 +2008,7 @@ function sota_magic_render_sota_data($atts) {
         <?php endif; ?>
 
         <?php if ($csv_url): ?>
-            <h3 style="margin-top:40px;">📡 <?php echo esc_html(get_option('sota_headline_csv')); ?></h3>
+            <h3 style="margin-top:40px;"><?php sota_magic_echo_svg('antenna', 22); ?> <?php echo esc_html(get_option('sota_headline_csv')); ?></h3>
             <div class="sota-table-wrapper">
                 <table class="sota-table">
                     <thead>
