@@ -94,9 +94,8 @@ window.sotaMagicInitMap = function (mapId, data) {
     // ── GPX track polyline ────────────────────────────────────────────────────
     var latLngs  = pts.map(function (pt) { return [pt[0], pt[1]]; });
     var polyline = L.polyline(latLngs, { color: '#e67e00', weight: 3, opacity: 0.85 }).addTo(map);
-    map.fitBounds(polyline.getBounds(), { padding: [24, 24] });
 
-    // ── Activation zone + zoom button ────────────────────────────────────────
+    // ── Activation zone ───────────────────────────────────────────────────────
     var az = data.activationZone;
     var azLayer = null;
 
@@ -114,6 +113,9 @@ window.sotaMagicInitMap = function (mapId, data) {
             }).addTo(map).bindPopup('Activation Zone (radius approx.)');
         }
     }
+
+    // Set initial view after all layers are added so Leaflet renders everything in one pass
+    map.fitBounds(polyline.getBounds(), { padding: [24, 24] });
 
     // ── Zoom to Activation Zone button (above the map) ───────────────────────
     var azBtn = document.createElement('button');
@@ -134,7 +136,7 @@ window.sotaMagicInitMap = function (mapId, data) {
         'transition:all 0.2s'
     ].join(';');
     azBtn.addEventListener('click', function () {
-        if (azLayer) map.fitBounds(azLayer.getBounds(), { padding: [40, 40] });
+        if (azLayer) map.fitBounds(azLayer.getBounds(), { padding: [40, 40], maxZoom: 15 });
     });
     mapEl.parentNode.insertBefore(azBtn, mapEl);
 

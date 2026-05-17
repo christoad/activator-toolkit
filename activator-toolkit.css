@@ -2,6 +2,22 @@
  * Static layout/structural rules; dynamic color overrides are added via wp_add_inline_style().
  */
 
+/* ── Typography ──────────────────────────────────────────────────────────────
+ * Applied only within plugin elements; does not bleed into theme typography.
+ * Falls back to the site's body font when sota_use_theme_font is checked.
+ */
+.sota-main-container,
+.sota-modal {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Callsigns and technical values get mono treatment */
+.sota-table td:nth-child(3),
+.sota-table th:nth-child(3) {
+    font-family: ui-monospace, 'SFMono-Round', 'SF Mono', Menlo, Consolas, monospace;
+    letter-spacing: 0.03em;
+}
+
 .sota-main-container {
     padding: 30px;
     border-radius: 12px;
@@ -11,6 +27,13 @@
     border-bottom-width: 1px;
     border-bottom-style: solid;
     padding-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.sota-main-container h3 svg {
+    flex-shrink: 0;
+    opacity: 0.8;
 }
 
 /* GPX Statistics Grid */
@@ -30,22 +53,36 @@
     border-radius: 6px;
 }
 .sota-stat-icon {
-    font-size: 28px;
-    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin: 0 auto 10px;
+    opacity: 0.75;
+}
+.sota-stat-icon svg {
+    width: 100%;
+    height: 100%;
 }
 .sota-stat-value {
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 5px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+    font-variant-numeric: tabular-nums;
 }
 .sota-stat-label {
-    font-size: 13px;
+    font-size: 11px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.06em;
+    opacity: 0.65;
 }
 .sota-stat-secondary {
     font-size: 12px;
-    margin-top: 5px;
+    margin-top: 6px;
+    opacity: 0.7;
 }
 
 /* Responsive table wrapper */
@@ -63,15 +100,22 @@
 .sota-table th {
     border-bottom-width: 2px;
     border-bottom-style: solid;
-    padding: 12px;
+    padding: 10px 12px;
     text-align: left;
     white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.6;
 }
 .sota-table td {
-    padding: 10px;
+    padding: 10px 12px;
     border-bottom-width: 1px;
     border-bottom-style: solid;
     vertical-align: top;
+    font-size: 14px;
+    line-height: 1.5;
 }
 .sota-table td:last-child {
     white-space: normal;
@@ -83,10 +127,13 @@
 }
 .s2s-badge {
     color: white;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 0.75em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.72em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
     margin-left: 5px;
+    text-transform: uppercase;
 }
 
 /* GPX map + elevation chart */
@@ -138,10 +185,15 @@
 }
 .sota-modal h2 {
     margin: 0 0 6px 0;
-    font-size: 20px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     color: #0073aa;
     border: none;
     padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 .sota-modal .sota-modal-subtitle {
     font-size: 13px;
@@ -168,19 +220,26 @@
 .sota-modal-section:first-of-type { border-top: none; padding-top: 0; }
 .sota-modal-section h3 {
     margin: 0 0 6px 0;
-    font-size: 15px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
     color: #1e1e1e;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     border: none;
     padding: 0;
+}
+.sota-modal-section h3 svg {
+    opacity: 0.7;
+    flex-shrink: 0;
 }
 .sota-modal-section p {
     margin: 0;
     font-size: 13px;
     color: #444;
-    line-height: 1.65;
+    line-height: 1.7;
+    text-wrap: pretty;
 }
 .sota-modal-section p + p { margin-top: 6px; }
 .sota-modal-note {
@@ -191,7 +250,16 @@
     border-radius: 4px;
     font-size: 12px;
     color: #444;
-    line-height: 1.6;
+    line-height: 1.7;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    text-wrap: pretty;
+}
+.sota-modal-note svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+    opacity: 0.65;
 }
 .sota-help-btn {
     display: inline-flex;
@@ -200,15 +268,19 @@
     background: none;
     border: 1px solid currentColor;
     border-radius: 20px;
-    padding: 3px 11px;
-    font-size: 12px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
     cursor: pointer;
-    opacity: 0.65;
+    opacity: 0.55;
     color: inherit;
-    font-family: sans-serif;
+    font-family: inherit;
     vertical-align: middle;
+    transition: opacity 0.15s;
 }
-.sota-help-btn:hover { opacity: 1; }
+.sota-help-btn:hover { opacity: 0.9; }
+.sota-help-btn svg { flex-shrink: 0; }
 .sota-stats-header {
     display: flex;
     align-items: center;
@@ -216,10 +288,10 @@
     margin: 12px 0 8px 0;
 }
 .sota-stats-header-label {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
-    opacity: 0.7;
-    letter-spacing: 0.03em;
+    opacity: 0.55;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
 }
 
@@ -253,7 +325,8 @@
         padding: 15px;
     }
     .sota-stat-icon {
-        font-size: 24px;
+        width: 30px;
+        height: 30px;
     }
     .sota-stat-value {
         font-size: 20px;
