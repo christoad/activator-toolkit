@@ -3,7 +3,7 @@ Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 1.1.1
+Stable tag: 1.1.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -147,6 +147,19 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.1.2 =
+* Improve: Summit marker on GPX map and contact map now uses minimalist SVG mountain icon instead of emoji
+* Improve: Contact map loading overlay now uses SVG mountain icon instead of emoji
+* Improve: Activation Zone button now toggles between "Zoom to Activation Zone" and "Zoom to Full Track"
+* Fix: Removed artificial maxZoom cap on Activation Zone button zoom
+* Fix: Contact map initial zoom now correctly fits all contacts within the visible frame
+
+= 1.1.1 =
+* New: Granular cache management tab — view, filter, and delete cached callsign locations individually
+* Improve: Plugin UI icons replaced with a consistent minimalist SVG icon set
+* Improve: Visual refresh across stats display and settings pages
+* Fix: Contact map fitBounds timing corrected for reliable initial zoom on all themes
 
 = 1.1.0 =
 * New: Callook.info lookup — automatic, free, no account needed; resolves US callsigns from FCC data
