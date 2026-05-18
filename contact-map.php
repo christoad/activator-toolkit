@@ -492,7 +492,7 @@ wp_add_inline_script( 'sota-cm-js', 'var sotaContactMapData = ' . wp_json_encode
 </head>
 <body>
     <div id="loading-overlay">
-        <div class="loading-icon">🏔️</div>
+        <div class="loading-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CC2200" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20L12 4L21 20H3Z"/><path d="M9 20L12 13L15 17"/></svg></div>
         <div class="loading-spinner"></div>
         <div class="loading-text">Loading contact map...</div>
     </div>

@@ -18,7 +18,7 @@
     } ).addTo( map );
 
     var summitIcon = L.divIcon( {
-        html:       '<div style="font-size:32px;text-align:center;line-height:32px;">\ud83c\udfd4\ufe0f</div>',
+        html:       '<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#CC2200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20L12 4L21 20H3Z"/><path d="M9 20L12 13L15 17"/></svg></div>',
         className:  'summit-icon',
         iconSize:   [ 32, 32 ],
         iconAnchor: [ 16, 16 ]
@@ -78,16 +78,28 @@
         allPoints.push( [ c.lat, c.lon ] );
     } );
 
-    map.whenReady( function () {
-        map.invalidateSize();
+    function fitAllPoints() {
         if ( allPoints.length > 1 ) {
-            map.fitBounds( L.latLngBounds( allPoints ), { padding: [ 50, 50 ] } );
+            map.fitBounds( L.latLngBounds( allPoints ), { padding: [ 60, 60 ], animate: false } );
         } else if ( allPoints.length === 1 ) {
             map.setView( allPoints[ 0 ], 10 );
         }
+    }
+
+    map.whenReady( function () {
+        // First pass — immediate fit
+        map.invalidateSize();
+        fitAllPoints();
+
+        // Second pass after a short delay — catches iframe resize settling
         setTimeout( function () {
-            document.getElementById( 'loading-overlay' ).classList.add( 'hidden' );
-        }, 500 );
+            map.invalidateSize();
+            fitAllPoints();
+            map.zoomIn( 1, { animate: false } );
+            setTimeout( function () {
+                document.getElementById( 'loading-overlay' ).classList.add( 'hidden' );
+            }, 300 );
+        }, 300 );
     } );
 
     if ( data.unresolved && data.unresolved.length > 0 ) {

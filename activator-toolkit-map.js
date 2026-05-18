@@ -114,13 +114,14 @@ window.sotaMagicInitMap = function (mapId, data) {
         }
     }
 
-    // Set initial view after all layers are added so Leaflet renders everything in one pass
-    map.fitBounds(polyline.getBounds(), { padding: [24, 24] });
+    // Set initial view to full GPX track
+    var trackBounds = polyline.getBounds();
+    map.fitBounds(trackBounds, { padding: [24, 24] });
 
-    // ── Zoom to Activation Zone button (above the map) ───────────────────────
+    // ── Zoom to Activation Zone / Full Track toggle button ────────────────────
+    var azZoomedIn = false;
     var azBtn = document.createElement('button');
-    azBtn.textContent = '🏔️ Zoom to Activation Zone';
-    azBtn.disabled    = !azLayer;
+    azBtn.disabled = !azLayer;
     azBtn.style.cssText = [
         'display:inline-block',
         'margin-bottom:6px',
@@ -135,8 +136,19 @@ window.sotaMagicInitMap = function (mapId, data) {
         'opacity:' + (azLayer ? '1' : '0.45'),
         'transition:all 0.2s'
     ].join(';');
+    function updateAzBtn() {
+        azBtn.textContent = azZoomedIn ? 'Zoom to Full Track' : 'Zoom to Activation Zone';
+    }
+    updateAzBtn();
     azBtn.addEventListener('click', function () {
-        if (azLayer) map.fitBounds(azLayer.getBounds(), { padding: [40, 40], maxZoom: 15 });
+        if (!azLayer) return;
+        azZoomedIn = !azZoomedIn;
+        if (azZoomedIn) {
+            map.fitBounds(azLayer.getBounds(), { padding: [40, 40] });
+        } else {
+            map.fitBounds(trackBounds, { padding: [24, 24] });
+        }
+        updateAzBtn();
     });
     mapEl.parentNode.insertBefore(azBtn, mapEl);
 
@@ -144,7 +156,7 @@ window.sotaMagicInitMap = function (mapId, data) {
     if (data.summitLat !== null && data.summitLon !== null) {
         L.marker([data.summitLat, data.summitLon], {
             icon: L.divIcon({
-                html: '<div style="font-size:24px;line-height:1;text-align:center;">🏔️</div>',
+                html: '<div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#CC2200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20L12 4L21 20H3Z"/><path d="M9 20L12 13L15 17"/></svg></div>',
                 className: 'sota-summit-marker',
                 iconSize: [30, 30],
                 iconAnchor: [15, 15]

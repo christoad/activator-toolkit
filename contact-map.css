@@ -34,4 +34,4 @@ body { font-family: sans-serif; }
 }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 .loading-text { margin-top: 20px; font-size: 16px; color: #666; }
-.loading-icon { font-size: 48px; margin-bottom: 10px; }
+.loading-icon { margin-bottom: 10px; line-height: 0; }
