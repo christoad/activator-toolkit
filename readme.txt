@@ -3,7 +3,7 @@ Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 1.1.2
+Stable tag: 1.1.3
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -147,6 +147,9 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.1.3 =
+* Improve: Hike statistics tiles now display in a fixed 2×3 grid for a cleaner, balanced layout
 
 = 1.1.2 =
 * Improve: Summit marker on GPX map and contact map now uses minimalist SVG mountain icon instead of emoji

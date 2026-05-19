@@ -39,7 +39,7 @@
 /* GPX Statistics Grid */
 .sota-gpx-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 20px;
     margin: 0 0 20px 0;
     padding: 20px;
@@ -320,7 +320,7 @@
         padding: 15px;
     }
     .sota-gpx-stats {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        grid-template-columns: repeat(2, 1fr);
         gap: 15px;
         padding: 15px;
     }
