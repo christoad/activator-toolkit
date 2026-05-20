@@ -2164,7 +2164,7 @@ function sota_magic_render_sota_data($atts) {
 
         <?php if ($map_iframe_url): ?>
             <h3 style="margin-top:40px;"><?php sota_magic_echo_svg('map', 22); ?> <?php echo esc_html(get_option('sota_headline_map')); ?></h3>
-            <iframe id="sota-contact-map-<?php echo $sota_map_counter; ?>" src="<?php echo esc_url($map_iframe_url); ?>"
+            <iframe id="sota-contact-map-<?php echo absint($sota_map_counter); ?>" src="<?php echo esc_url($map_iframe_url); ?>"
                     style="width:100%; height:500px; border:none; border-radius:8px; background:#f5f5f5;"
                     title="Contact Map">
             </iframe>
@@ -2173,7 +2173,7 @@ function sota_magic_render_sota_data($atts) {
         <?php if ($csv_url): ?>
             <h3 style="margin-top:40px;"><?php sota_magic_echo_svg('antenna', 22); ?> <?php echo esc_html(get_option('sota_headline_csv')); ?></h3>
             <div class="sota-table-wrapper">
-                <table class="sota-table" id="sota-contact-table-<?php echo $sota_map_counter; ?>">
+                <table class="sota-table" id="sota-contact-table-<?php echo absint($sota_map_counter); ?>">
                     <thead>
                         <tr>
                             <th>Date</th>
@@ -2253,7 +2253,7 @@ function sota_magic_render_sota_data($atts) {
         <?php endif; ?>
         <?php if ( $map_iframe_url && $csv_url ):
             if ( ! wp_script_is( 'sota-table-hover', 'registered' ) ) {
-                wp_register_script( 'sota-table-hover', '', [], false, true );
+                wp_register_script( 'sota-table-hover', '', [], '1.1.4', true );
             }
             wp_enqueue_script( 'sota-table-hover' );
             $hover_js = '(function(){'
