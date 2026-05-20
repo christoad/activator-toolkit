@@ -148,6 +148,15 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 
 == Changelog ==
 
+= 1.1.4 =
+* New: ADIF log file support — upload .adif or .adi files in addition to SOTA CSV; format is detected automatically
+* New: Modal prompts for summit reference when log file does not include one (works for both CSV and ADIF)
+* New: Summit Reference field in block inspector sidebar for easy review and correction after upload
+* New: Hovering a row in the contacts table highlights the corresponding marker on the contact map
+* Improve: Contacts table sorted oldest-to-newest regardless of order in the source file
+* Fix: Contact map markers now reliably open on first click (polylines were intercepting click events)
+* Fix: Contact map zoom now correctly fits all contacts without clipping at the edges
+
 = 1.1.3 =
 * Improve: Hike statistics tiles now display in a fixed 2×3 grid for a cleaner, balanced layout
 
