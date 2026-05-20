@@ -1499,7 +1499,7 @@ add_action('enqueue_block_editor_assets', function() {
                                 wp.element.createElement('li', {style:{marginBottom:'5px'}}, wp.element.createElement('strong', null, 'Summit reference'), ' is read from your CSV file (e.g. W6/CT-001).'),
                                 wp.element.createElement('li', {style:{marginBottom:'5px'}}, wp.element.createElement('strong', null, 'Official coordinates'), ' are fetched from the SOTA API (api2.sota.org.uk).'),
                                 wp.element.createElement('li', {style:{marginBottom:'5px'}}, wp.element.createElement('strong', null, 'Activation.Zone API'), ' (by N6ARA) returns a precise terrain-based polygon using the official 25m vertical drop rule.'),
-                                wp.element.createElement('li', null, wp.element.createElement('strong', null, 'Fallback:'), ' if no summit reference or the API is unavailable, a radius circle is drawn around the highest GPS point in your track.')
+                                wp.element.createElement('li', null, wp.element.createElement('strong', null, 'Fallback:'), ' if the Activation.Zone API is unavailable, a radius circle is drawn around the official SOTA summit coordinates. If the SOTA API is also unavailable (or no summit reference was found), the highest GPS point in your track is used instead.')
                             ),
 
                             wp.element.createElement('hr', {style:{border:'none', borderTop:'1px solid \\x23eeeeee', margin:'14px 0'}}),
@@ -1522,7 +1522,7 @@ add_action('enqueue_block_editor_assets', function() {
                                 wp.element.createElement('strong', null, 'Hiking time seems too high'), ' — Rest breaks are included in hiking time. Adjust the rest break threshold in Settings → Activator Toolkit for SOTA.'
                             ),
                             wp.element.createElement('p', {style:{margin:'0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
-                                wp.element.createElement('strong', null, 'GPS track does not reach the summit'), ' — The zone is centred on the highest point in your track. If you stopped before the peak, use the Activation Zone radius override below or manually enter the activation time.'
+                                wp.element.createElement('strong', null, 'GPS track does not reach the summit'), ' — The zone is centred on the official SOTA summit coordinates (or the highest GPS point if the SOTA API was unavailable). If you stopped before the peak, use the Activation Zone radius override below or manually enter the activation time.'
                             )
                         )
                     ),
