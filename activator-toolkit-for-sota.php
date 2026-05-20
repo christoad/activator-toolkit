@@ -3,7 +3,7 @@
  * Plugin Name: Activator Toolkit for Summits on the Air (SOTA)
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
- * Version: 1.1.3
+ * Version: 1.1.4
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
@@ -78,16 +78,22 @@ add_filter('plugin_action_links_' . plugin_basename(__FILE__), function($links) 
     return $links;
 });
 
-// Allow GPX uploads
+// Allow GPX and ADIF uploads
 add_filter('upload_mimes', function($mimes) {
-    $mimes['gpx'] = 'application/gpx+xml';
+    $mimes['gpx']  = 'application/gpx+xml';
+    $mimes['adif'] = 'text/plain';
+    $mimes['adi']  = 'text/plain';
     return $mimes;
 });
 
 add_filter('wp_check_filetype_and_ext', function($data, $file, $filename) {
-    if (pathinfo($filename, PATHINFO_EXTENSION) === 'gpx') {
-        $data['ext'] = 'gpx';
+    $ext = pathinfo($filename, PATHINFO_EXTENSION);
+    if ($ext === 'gpx') {
+        $data['ext']  = 'gpx';
         $data['type'] = 'application/gpx+xml';
+    } elseif (in_array($ext, ['adif', 'adi'], true)) {
+        $data['ext']  = $ext;
+        $data['type'] = 'text/plain';
     }
     return $data;
 }, 10, 3);
@@ -749,7 +755,7 @@ function sota_magic_point_in_polygon($lat, $lon, $polygon) {
  * Analyze GPX track to determine hiking vs stationary time
  * Uses hybrid approach: activation.zone API (if enabled) or radius fallback
  */
-function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false) {
+function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false, $summit_ref_override = null) {
     $stationary_threshold = floatval(get_option('sota_stationary_threshold', 0.3)); // km/h
     $activation_zone_radius = floatval(get_option('sota_activation_zone_radius', 50)); // meters
     $rest_threshold_minutes = floatval(get_option('sota_rest_threshold_minutes', 10)); // minutes
@@ -806,15 +812,17 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
         }
     }
     
-    // --- Step 1: Extract summit reference from CSV (always, regardless of zone method) ---
+    // --- Step 1: Extract summit reference ---
     $summit_ref = null;
-    if ($csv_url) {
-        $csv_response = wp_remote_get($csv_url, ['timeout' => 15]);
-        if (!is_wp_error($csv_response)) {
-            $csv_body = wp_remote_retrieve_body($csv_response);
-            foreach (explode("\n", $csv_body) as $csv_line) {
-                $row = str_getcsv(trim($csv_line));
-                if (!empty($row[0]) && $row[0] === 'V2' && !empty($row[2])) {
+    if ( ! empty( $summit_ref_override ) ) {
+        $summit_ref = $summit_ref_override;
+    } elseif ( $csv_url ) {
+        $csv_response = wp_remote_get( $csv_url, [ 'timeout' => 15 ] );
+        if ( ! is_wp_error( $csv_response ) ) {
+            $csv_body = wp_remote_retrieve_body( $csv_response );
+            foreach ( explode( "\n", $csv_body ) as $csv_line ) {
+                $row = str_getcsv( trim( $csv_line ) );
+                if ( ! empty( $row[0] ) && $row[0] === 'V2' && ! empty( $row[2] ) ) {
                     $summit_ref = $row[2];
                     break;
                 }
@@ -1198,6 +1206,85 @@ function sota_magic_get_speed_unit($unit_system = 'metric') {
     return $unit_system === 'imperial' ? 'mph' : 'km/h';
 }
 
+/**
+ * Extract a single field value from an ADIF record string.
+ * Uses the declared byte-length for precision: <FIELD:N>value
+ */
+function sota_magic_adif_field( $record, $field ) {
+    if ( preg_match( '/<' . preg_quote( $field, '/' ) . ':(\d+)[^>]*>/i', $record, $m, PREG_OFFSET_CAPTURE ) ) {
+        $tag_end = $m[0][1] + strlen( $m[0][0] );
+        $len     = (int) $m[1][0];
+        return trim( substr( $record, $tag_end, $len ) );
+    }
+    return '';
+}
+
+/**
+ * Download and parse an ADIF log file, returning a normalised contacts array
+ * matching the structure produced by the CSV parser.
+ *
+ * @param string $log_url             WordPress media URL pointing to .adi/.adif file.
+ * @param string $summit_ref_override Summit ref to use when MY_SOTA_REF is absent.
+ * @return array
+ */
+function sota_magic_parse_adif_contacts( $log_url, $summit_ref_override = '' ) {
+    $response = wp_remote_get( $log_url, [ 'timeout' => 15 ] );
+    if ( is_wp_error( $response ) ) return [];
+    $body = wp_remote_retrieve_body( $response );
+    if ( ! $body ) return [];
+
+    // Strip header (everything up to and including <EOH>)
+    $body = preg_replace( '/^.*?<EOH>/is', '', $body );
+
+    $raw_records = preg_split( '/<EOR>/i', $body );
+    $contacts    = [];
+
+    foreach ( $raw_records as $record ) {
+        $record = trim( $record );
+        if ( '' === $record ) continue;
+
+        $call = sota_magic_adif_field( $record, 'call' );
+        if ( '' === $call ) continue;
+
+        // Date: YYYYMMDD → DD/MM/YY
+        $raw_date = sota_magic_adif_field( $record, 'qso_date' );
+        $date     = '';
+        if ( strlen( $raw_date ) === 8 ) {
+            $date = substr( $raw_date, 6, 2 ) . '/' . substr( $raw_date, 4, 2 ) . '/' . substr( $raw_date, 2, 2 );
+        }
+
+        // Time: HHMMSS → HH:MM
+        $raw_time = sota_magic_adif_field( $record, 'time_on' );
+        $time     = ( strlen( $raw_time ) >= 4 )
+            ? substr( $raw_time, 0, 2 ) . ':' . substr( $raw_time, 2, 2 )
+            : $raw_time;
+
+        // Frequency: prefer <FREQ> (MHz), fall back to <BAND>
+        $freq = sota_magic_adif_field( $record, 'freq' );
+        if ( '' === $freq ) $freq = sota_magic_adif_field( $record, 'band' );
+
+        $mode        = sota_magic_adif_field( $record, 'mode' );
+        $my_sota_ref = sota_magic_adif_field( $record, 'my_sota_ref' );
+        if ( '' === $my_sota_ref ) $my_sota_ref = $summit_ref_override;
+        $sota_ref    = sota_magic_adif_field( $record, 'sota_ref' );
+        $comments    = sota_magic_adif_field( $record, 'comment' );
+        if ( '' === $comments ) $comments = sota_magic_adif_field( $record, 'notes' );
+
+        $contacts[] = [
+            'my_summit'    => $my_sota_ref,
+            'date'         => $date,
+            'time'         => $time,
+            'frequency'    => $freq,
+            'mode'         => $mode,
+            'callsign'     => strtoupper( $call ),
+            'their_summit' => $sota_ref,
+            'comments'     => $comments,
+        ];
+    }
+
+    return $contacts;
+}
+
 // BLOCK REGISTRATION
 add_action('init', function() {
     wp_register_style( 'activator-toolkit', plugins_url( 'activator-toolkit.css', __FILE__ ), [], '1.0.3' );
@@ -1304,15 +1391,35 @@ add_action('enqueue_block_editor_assets', function() {
                 overrideRestBreaks: {type:'string', default:''},
                 overrideTotalTimeEnabled: {type:'boolean', default:false},
                 overrideTotalTime: {type:'string', default:''},
-                hideGpxStats: {type:'boolean', default:false}
+                hideGpxStats: {type:'boolean', default:false},
+                logFormat: {type:'string', default:'csv'},
+                mySummitRef: {type:'string', default:''}
             },
             edit: function(props) {
                 var _ms = wp.element.useState(false);
                 var showModal = _ms[0];
                 var setShowModal = _ms[1];
-                return wp.element.createElement('div', {
-                    style:{padding:'25px', background:'\\x23f5f5f5', border:'2px dashed \\x230073aa', borderRadius:'8px', textAlign:'center'}
-                },
+                var _srf = wp.element.useState(false);
+                var showSummitRefModal = _srf[0];
+                var setShowSummitRefModal = _srf[1];
+                var _sri = wp.element.useState('');
+                var summitRefInput = _sri[0];
+                var setSummitRefInput = _sri[1];
+                var InspectorControls = (wp.blockEditor || wp.editor).InspectorControls;
+                return wp.element.createElement(wp.element.Fragment, null,
+                    wp.element.createElement(InspectorControls, null,
+                        wp.element.createElement(wp.components.PanelBody, {title:'Activation Details', initialOpen:true},
+                            wp.element.createElement(wp.components.TextControl, {
+                                label:'Summit Reference',
+                                help:'Auto-detected from your log file. Edit if needed (e.g. W6/SC-219).',
+                                value:props.attributes.mySummitRef || '',
+                                onChange:function(val){props.setAttributes({mySummitRef:val});}
+                            })
+                        )
+                    ),
+                    wp.element.createElement('div', {
+                        style:{padding:'25px', background:'\\x23f5f5f5', border:'2px dashed \\x230073aa', borderRadius:'8px', textAlign:'center'}
+                    },
                     wp.element.createElement('h3', {style:{margin:'0 0 10px 0', color:'\\x230073aa'}}, 'SOTA Activator Toolkit'),
                     wp.element.createElement('p', {style:{color:'\\x23d32f2f', fontWeight:'bold', margin:'0 0 10px 0'}}, 'Map and table visible in Preview only'),
                     wp.element.createElement('p', {style:{color:'\\x23666', fontSize:'13px', marginBottom:'16px'}}, 'Settings → Activator Toolkit for SOTA to customize colors, units, and more.'),
@@ -1337,19 +1444,39 @@ add_action('enqueue_block_editor_assets', function() {
                         ),
                         wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', display:'flex', alignItems:'center', gap:'12px'}},
                             wp.element.createElement('div', {style:{flex:'1', minWidth:'0'}},
-                                wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, '📋 Contacts Log (.csv)'),
-                                wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, 'The same CSV file you upload to the official SOTA website (sotadata.org.uk) — SOTA CSV v2 format.')
+                                wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, '📋 Contacts Log (.csv or .adif)'),
+                                wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, 'Upload your SOTA formatted CSV or ADIF log file — the format is detected automatically.')
                             ),
                             wp.element.createElement(wp.editor.MediaUpload, {
-                                onSelect: function(media) { props.setAttributes({csvUrl: media.url}); },
-                                allowedTypes: ['text/csv'],
+                                onSelect: function(media) {
+                                    var url = media.url;
+                                    var ext = url.split('?')[0].split('.').pop().toLowerCase();
+                                    var isAdif = (ext === 'adif' || ext === 'adi');
+                                    var fmt = isAdif ? 'adif' : 'csv';
+                                    props.setAttributes({csvUrl: url, logFormat: fmt, mySummitRef: ''});
+                                    fetch(url).then(function(r){ return r.text(); }).then(function(content){
+                                        var ref = '';
+                                        if (isAdif) {
+                                            var m = content.match(/<my_sota_ref:\\d+[^>]*>([^\\r\\n<]+)/i);
+                                            ref = m ? m[1].trim() : '';
+                                        } else {
+                                            var lines = content.split('\\n');
+                                            for (var i = 0; i < lines.length; i++) {
+                                                var p = lines[i].split(',');
+                                                if (p[0] && p[0].trim() === 'V2' && p[2] && p[2].trim()) { ref = p[2].trim(); break; }
+                                            }
+                                        }
+                                        if (ref) { props.setAttributes({mySummitRef: ref}); } else { setSummitRefInput(''); setShowSummitRefModal(true); }
+                                    }).catch(function(){});
+                                },
+                                allowedTypes: ['text/csv', 'text/plain'],
                                 render: function(obj) {
                                     return wp.element.createElement(wp.components.Button, {
                                         isPrimary: !!props.attributes.csvUrl,
                                         isSecondary: !props.attributes.csvUrl,
                                         onClick: obj.open,
                                         style:{flexShrink:'0', whiteSpace:'nowrap'}
-                                    }, props.attributes.csvUrl ? '✓ CSV Uploaded' : 'Upload CSV');
+                                    }, props.attributes.csvUrl ? '✓ Log Uploaded' : 'Upload Log File');
                                 }
                             })
                         )
@@ -1396,6 +1523,36 @@ add_action('enqueue_block_editor_assets', function() {
                             ),
                             wp.element.createElement('p', {style:{margin:'0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
                                 wp.element.createElement('strong', null, 'GPS track does not reach the summit'), ' — The zone is centred on the highest point in your track. If you stopped before the peak, use the Activation Zone radius override below or manually enter the activation time.'
+                            )
+                        )
+                    ),
+                    showSummitRefModal && wp.element.createElement(wp.components.Modal, {
+                        title: 'Summit Reference Required',
+                        onRequestClose: function() { setShowSummitRefModal(false); }
+                    },
+                        wp.element.createElement('div', {style:{fontSize:'13px', lineHeight:'1.65', color:'\\x23333333', maxWidth:'420px'}},
+                            wp.element.createElement('p', {style:{marginTop:'0', marginBottom:'12px'}},
+                                'Your log file does not include a summit reference (MY_SOTA_REF / column 3). Enter it below to enable the activation zone and contact map.'
+                            ),
+                            wp.element.createElement('input', {
+                                type: 'text',
+                                placeholder: 'e.g. W6/SC-219',
+                                value: summitRefInput,
+                                onChange: function(e) { setSummitRefInput(e.target.value); },
+                                style:{width:'100%', padding:'6px 8px', fontSize:'14px', borderRadius:'4px', border:'1px solid \\x23cccccc', marginBottom:'14px', boxSizing:'border-box'}
+                            }),
+                            wp.element.createElement('div', {style:{display:'flex', gap:'8px', justifyContent:'flex-end'}},
+                                wp.element.createElement(wp.components.Button, {
+                                    isSecondary: true,
+                                    onClick: function() { setShowSummitRefModal(false); }
+                                }, 'Skip for now'),
+                                wp.element.createElement(wp.components.Button, {
+                                    isPrimary: true,
+                                    onClick: function() {
+                                        if (summitRefInput.trim()) { props.setAttributes({mySummitRef: summitRefInput.trim()}); }
+                                        setShowSummitRefModal(false);
+                                    }
+                                }, 'Save')
                             )
                         )
                     ),
@@ -1557,6 +1714,7 @@ add_action('enqueue_block_editor_assets', function() {
                             'To clear cached contact locations, go to Settings → Activator Toolkit for SOTA → Callsign Lookup.'
                         )
                     )
+                    )
                 );
             },
             save: function() { return null; }
@@ -1681,8 +1839,10 @@ function sota_parse_time_override($hhmm) {
 }
 
 function sota_magic_render_sota_data($atts) {
-    $gpx_url = $atts['gpxUrl'] ?? '';
-    $csv_url = $atts['csvUrl'] ?? '';
+    $gpx_url       = $atts['gpxUrl'] ?? '';
+    $csv_url       = $atts['csvUrl'] ?? '';
+    $log_format    = $atts['logFormat'] ?? 'csv';
+    $my_summit_ref = trim($atts['mySummitRef'] ?? '');
     if (!$gpx_url && !$csv_url) return '';
 
     // Manual override attributes (only applied when their Enabled flag is checked)
@@ -1709,7 +1869,7 @@ function sota_magic_render_sota_data($atts) {
     $gpx_stats = null;
     $track_points = [];
     if ($gpx_url && $show_gpx_stats) {
-        $gpx_stats = sota_magic_analyze_gpx_track($gpx_url, $csv_url, $force_radius_zone);
+        $gpx_stats = sota_magic_analyze_gpx_track($gpx_url, $csv_url, $force_radius_zone, $my_summit_ref ?: null);
         if ($gpx_stats && !empty($gpx_stats['track_points'])) {
             $track_points = $gpx_stats['track_points'];
         }
@@ -1759,7 +1919,10 @@ function sota_magic_render_sota_data($atts) {
     $map_iframe_url = '';
     if ($show_map && $csv_url) {
         $sota_magic_debug_param = (get_option('sota_debug_mode_public') || (get_option('sota_debug_mode') && current_user_can('manage_options'))) ? '&debug=1' : '';
-        $map_iframe_url = admin_url('admin-ajax.php') . '?action=sota_magic_contact_map&csv=' . urlencode($csv_url) . '&_nonce=' . wp_create_nonce('sota_magic_contact_map') . $sota_magic_debug_param;
+        $map_iframe_url = admin_url('admin-ajax.php') . '?action=sota_magic_contact_map&csv=' . urlencode($csv_url)
+            . '&format=' . urlencode($log_format)
+            . ( $my_summit_ref ? '&summit_ref=' . urlencode($my_summit_ref) : '' )
+            . '&_nonce=' . wp_create_nonce('sota_magic_contact_map') . $sota_magic_debug_param;
     }
 
     // Unique map ID for this block (static counter survives multiple blocks on one page)
@@ -2001,8 +2164,8 @@ function sota_magic_render_sota_data($atts) {
 
         <?php if ($map_iframe_url): ?>
             <h3 style="margin-top:40px;"><?php sota_magic_echo_svg('map', 22); ?> <?php echo esc_html(get_option('sota_headline_map')); ?></h3>
-            <iframe src="<?php echo esc_url($map_iframe_url); ?>" 
-                    style="width:100%; height:500px; border:none; border-radius:8px; background:#f5f5f5;" 
+            <iframe id="sota-contact-map-<?php echo $sota_map_counter; ?>" src="<?php echo esc_url($map_iframe_url); ?>"
+                    style="width:100%; height:500px; border:none; border-radius:8px; background:#f5f5f5;"
                     title="Contact Map">
             </iframe>
         <?php endif; ?>
@@ -2010,7 +2173,7 @@ function sota_magic_render_sota_data($atts) {
         <?php if ($csv_url): ?>
             <h3 style="margin-top:40px;"><?php sota_magic_echo_svg('antenna', 22); ?> <?php echo esc_html(get_option('sota_headline_csv')); ?></h3>
             <div class="sota-table-wrapper">
-                <table class="sota-table">
+                <table class="sota-table" id="sota-contact-table-<?php echo $sota_map_counter; ?>">
                     <thead>
                         <tr>
                             <th>Date</th>
@@ -2025,45 +2188,87 @@ function sota_magic_render_sota_data($atts) {
                     </thead>
                     <tbody>
                     <?php
-                    $csv_table_response = wp_remote_get($csv_url, ['timeout' => 15]);
-                    if (!is_wp_error($csv_table_response)) {
-                        $csv_table_body = wp_remote_retrieve_body($csv_table_response);
-                        foreach (explode("\n", $csv_table_body) as $csv_table_line) {
-                            $data = str_getcsv(trim($csv_table_line));
-                            if (empty($data[0]) || $data[0] !== 'V2') continue;
-                            $s2s = !empty(trim($data[8] ?? ''));
-
-                            // Format date according to WordPress settings
-                            $csv_date = $data[3]; // Format: DD/MM/YY (e.g., 16/01/26)
-                            $parts = explode('/', $csv_date);
-                            if (count($parts) === 3) {
-                                $day   = (int) $parts[0];
-                                $month = (int) $parts[1];
-                                $year  = (int) $parts[2];
-                                // Handle 2-digit year (26 = 2026, not 1926)
-                                $year = $year < 50 ? 2000 + $year : 1900 + $year;
-                                $formatted_date = date_i18n(get_option('date_format'), strtotime("$year-$month-$day"));
-                            } else {
-                                $formatted_date = $csv_date; // Fallback to original
+                    $table_contacts = [];
+                    if ( $log_format === 'adif' ) {
+                        $table_contacts = sota_magic_parse_adif_contacts( $csv_url, $my_summit_ref );
+                    } else {
+                        $csv_table_response = wp_remote_get($csv_url, ['timeout' => 15]);
+                        if (!is_wp_error($csv_table_response)) {
+                            $csv_table_body = wp_remote_retrieve_body($csv_table_response);
+                            foreach (explode("\n", $csv_table_body) as $csv_table_line) {
+                                $row = str_getcsv(trim($csv_table_line));
+                                if (empty($row[0]) || $row[0] !== 'V2') continue;
+                                $table_contacts[] = [
+                                    'my_summit'    => $row[2] ?? '',
+                                    'date'         => $row[3] ?? '',
+                                    'time'         => $row[4] ?? '',
+                                    'frequency'    => $row[5] ?? '',
+                                    'mode'         => $row[6] ?? '',
+                                    'callsign'     => $row[7] ?? '',
+                                    'their_summit' => trim($row[8] ?? ''),
+                                    'comments'     => trim($row[9] ?? ''),
+                                ];
                             }
-
-                            echo '<tr class="' . ($s2s ? 's2s-row' : '') . '">';
-                            echo '<td>' . esc_html($formatted_date) . '</td>';
-                            echo '<td>' . esc_html($data[4] ?? '') . '</td>';
-                            echo '<td><strong>' . esc_html($data[7] ?? '') . '</strong>' . ($s2s ? '<span class="s2s-badge">S2S</span>' : '') . '</td>';
-                            echo '<td>' . esc_html($data[5] ?? '') . '</td>';
-                            echo '<td>' . esc_html($data[6] ?? '') . '</td>';
-                            echo '<td>' . esc_html($data[2] ?? '') . '</td>';
-                            echo '<td>' . esc_html($data[8] ?? '') . '</td>';
-                            echo '<td>' . esc_html($data[9] ?? '') . '</td>';
-                            echo '</tr>';
                         }
+                    }
+                    usort($table_contacts, function($a, $b) {
+                        $to_sort_key = function($c) {
+                            $parts = explode('/', $c['date']);
+                            if (count($parts) === 3) {
+                                $y = (int)$parts[2]; $y = $y < 50 ? 2000 + $y : 1900 + $y;
+                                $date_key = sprintf('%04d%02d%02d', $y, (int)$parts[1], (int)$parts[0]);
+                            } else { $date_key = $c['date']; }
+                            return $date_key . str_replace(':', '', $c['time']);
+                        };
+                        return strcmp($to_sort_key($a), $to_sort_key($b));
+                    });
+                    foreach ($table_contacts as $tc) {
+                        $s2s = !empty($tc['their_summit']);
+                        $csv_date = $tc['date']; // DD/MM/YY
+                        $parts = explode('/', $csv_date);
+                        if (count($parts) === 3) {
+                            $day   = (int) $parts[0];
+                            $month = (int) $parts[1];
+                            $year  = (int) $parts[2];
+                            $year  = $year < 50 ? 2000 + $year : 1900 + $year;
+                            $formatted_date = date_i18n(get_option('date_format'), strtotime("$year-$month-$day"));
+                        } else {
+                            $formatted_date = $csv_date;
+                        }
+                        echo '<tr class="' . ($s2s ? 's2s-row' : '') . '" data-callsign="' . esc_attr($tc['callsign']) . '">';
+                        echo '<td>' . esc_html($formatted_date) . '</td>';
+                        echo '<td>' . esc_html($tc['time']) . '</td>';
+                        echo '<td><strong>' . esc_html($tc['callsign']) . '</strong>' . ($s2s ? '<span class="s2s-badge">S2S</span>' : '') . '</td>';
+                        echo '<td>' . esc_html($tc['frequency']) . '</td>';
+                        echo '<td>' . esc_html($tc['mode']) . '</td>';
+                        echo '<td>' . esc_html($tc['my_summit']) . '</td>';
+                        echo '<td>' . esc_html($tc['their_summit']) . '</td>';
+                        echo '<td>' . esc_html($tc['comments']) . '</td>';
+                        echo '</tr>';
                     }
                     ?>
                     </tbody>
                 </table>
             </div>
         <?php endif; ?>
+        <?php if ( $map_iframe_url && $csv_url ):
+            if ( ! wp_script_is( 'sota-table-hover', 'registered' ) ) {
+                wp_register_script( 'sota-table-hover', '', [], false, true );
+            }
+            wp_enqueue_script( 'sota-table-hover' );
+            $hover_js = '(function(){'
+                . 'var iframe=document.getElementById("sota-contact-map-' . $sota_map_counter . '");'
+                . 'if(!iframe)return;'
+                . 'var rows=document.querySelectorAll("#sota-contact-table-' . $sota_map_counter . ' tbody tr[data-callsign]");'
+                . 'function send(msg){try{iframe.contentWindow.postMessage(msg,"*");}catch(e){}}'
+                . 'rows.forEach(function(row){'
+                .     'row.style.cursor="pointer";'
+                .     'row.addEventListener("mouseenter",function(){send({action:"show",callsign:row.dataset.callsign});});'
+                .     'row.addEventListener("mouseleave",function(){send({action:"hide"});});'
+                . '});'
+                . '})();';
+            wp_add_inline_script( 'sota-table-hover', $hover_js );
+        endif; ?>
     </div>
     <?php
     return ob_get_clean();

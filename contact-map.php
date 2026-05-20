@@ -50,10 +50,12 @@ if ( ! isset( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_un
 }
 
 // Get and sanitize parameters
-$sota_magic_debug_mode = ( isset( $_GET['debug'] ) && $_GET['debug'] === '1' );
-$sota_magic_csv_url = isset( $_GET['csv'] ) ? esc_url_raw( wp_unslash( $_GET['csv'] ) ) : '';
+$sota_magic_debug_mode        = ( isset( $_GET['debug'] ) && $_GET['debug'] === '1' );
+$sota_magic_csv_url           = isset( $_GET['csv'] ) ? esc_url_raw( wp_unslash( $_GET['csv'] ) ) : '';
+$sota_magic_log_format        = isset( $_GET['format'] ) ? sanitize_key( wp_unslash( $_GET['format'] ) ) : 'csv';
+$sota_magic_summit_ref_param  = isset( $_GET['summit_ref'] ) ? sanitize_text_field( wp_unslash( $_GET['summit_ref'] ) ) : '';
 if ( ! $sota_magic_csv_url ) {
-    echo '<div style="padding:20px;">No CSV file specified</div>';
+    echo '<div style="padding:20px;">No log file specified</div>';
     exit;
 }
 
@@ -63,24 +65,28 @@ $sota_magic_qrz_pass    = sota_magic_decrypt_credential( get_option( 'sota_qrz_p
 $sota_magic_hamqth_user = get_option( 'sota_hamqth_username' );
 $sota_magic_hamqth_pass = sota_magic_decrypt_credential( get_option( 'sota_hamqth_password' ) );
 
-// Parse CSV via wp_remote_get
+// Parse log file (CSV or ADIF)
 $sota_magic_contacts = [];
-$sota_magic_csv_response = wp_remote_get( $sota_magic_csv_url, [ 'timeout' => 15 ] );
-if ( ! is_wp_error( $sota_magic_csv_response ) ) {
-    $sota_magic_csv_body = wp_remote_retrieve_body( $sota_magic_csv_response );
-    foreach ( explode( "\n", $sota_magic_csv_body ) as $sota_magic_csv_line ) {
-        $sota_magic_row = str_getcsv( trim( $sota_magic_csv_line ) );
-        if ( ! empty( $sota_magic_row[0] ) && $sota_magic_row[0] === 'V2' ) {
-            $sota_magic_contacts[] = [
-                'my_summit'    => $sota_magic_row[2] ?? '',
-                'date'         => $sota_magic_row[3] ?? '',
-                'time'         => $sota_magic_row[4] ?? '',
-                'frequency'    => $sota_magic_row[5] ?? '',
-                'mode'         => $sota_magic_row[6] ?? '',
-                'callsign'     => $sota_magic_row[7] ?? '',
-                'their_summit' => trim( $sota_magic_row[8] ?? '' ),
-                'comments'     => trim( $sota_magic_row[9] ?? '' ),
-            ];
+if ( $sota_magic_log_format === 'adif' ) {
+    $sota_magic_contacts = sota_magic_parse_adif_contacts( $sota_magic_csv_url, $sota_magic_summit_ref_param );
+} else {
+    $sota_magic_csv_response = wp_remote_get( $sota_magic_csv_url, [ 'timeout' => 15 ] );
+    if ( ! is_wp_error( $sota_magic_csv_response ) ) {
+        $sota_magic_csv_body = wp_remote_retrieve_body( $sota_magic_csv_response );
+        foreach ( explode( "\n", $sota_magic_csv_body ) as $sota_magic_csv_line ) {
+            $sota_magic_row = str_getcsv( trim( $sota_magic_csv_line ) );
+            if ( ! empty( $sota_magic_row[0] ) && $sota_magic_row[0] === 'V2' ) {
+                $sota_magic_contacts[] = [
+                    'my_summit'    => $sota_magic_row[2] ?? '',
+                    'date'         => $sota_magic_row[3] ?? '',
+                    'time'         => $sota_magic_row[4] ?? '',
+                    'frequency'    => $sota_magic_row[5] ?? '',
+                    'mode'         => $sota_magic_row[6] ?? '',
+                    'callsign'     => $sota_magic_row[7] ?? '',
+                    'their_summit' => trim( $sota_magic_row[8] ?? '' ),
+                    'comments'     => trim( $sota_magic_row[9] ?? '' ),
+                ];
+            }
         }
     }
 }

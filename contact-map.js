@@ -34,6 +34,7 @@
     }
 
     var allPoints = [];
+    var markersByCallsign = {};
     if ( data.summit ) {
         allPoints.push( [ data.summit.lat, data.summit.lon ] );
     }
@@ -71,16 +72,18 @@
         if ( data.summit ) {
             L.polyline(
                 [ [ data.summit.lat, data.summit.lon ], [ c.lat, c.lon ] ],
-                { color: c.color, weight: 3, opacity: 0.7 }
+                { color: c.color, weight: 3, opacity: 0.7, interactive: false }
             ).addTo( map );
         }
 
         allPoints.push( [ c.lat, c.lon ] );
+        if ( !markersByCallsign[ c.callsign ] ) markersByCallsign[ c.callsign ] = [];
+        markersByCallsign[ c.callsign ].push( contactCircle );
     } );
 
     function fitAllPoints() {
         if ( allPoints.length > 1 ) {
-            map.fitBounds( L.latLngBounds( allPoints ), { padding: [ 60, 60 ], animate: false } );
+            map.fitBounds( L.latLngBounds( allPoints ), { padding: [ 40, 40 ], animate: false } );
         } else if ( allPoints.length === 1 ) {
             map.setView( allPoints[ 0 ], 10 );
         }
@@ -95,11 +98,20 @@
         setTimeout( function () {
             map.invalidateSize();
             fitAllPoints();
-            map.zoomIn( 1, { animate: false } );
             setTimeout( function () {
                 document.getElementById( 'loading-overlay' ).classList.add( 'hidden' );
             }, 300 );
         }, 300 );
+    } );
+
+    window.addEventListener( 'message', function ( e ) {
+        if ( !e.data || typeof e.data !== 'object' ) return;
+        if ( e.data.action === 'show' ) {
+            var markers = markersByCallsign[ e.data.callsign ];
+            if ( markers && markers.length > 0 ) markers[ 0 ].openPopup();
+        } else if ( e.data.action === 'hide' ) {
+            map.closePopup();
+        }
     } );
 
     if ( data.unresolved && data.unresolved.length > 0 ) {

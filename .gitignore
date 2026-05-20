@@ -11,3 +11,5 @@ CLAUDE.md
 *.psd
 artwork/logotest.png
 video-assets/
+*.adif
+*.adi
