@@ -3,14 +3,14 @@
  * Plugin Name: Activator Toolkit for Summits on the Air (SOTA)
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
- * Version: 1.1.4
+ * Version: 1.1.5
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: activator-toolkit-for-sota
  * Requires at least: 6.0
- * Tested up to: 6.9
+ * Tested up to: 7.0
  * Requires PHP: 7.4
  */
 
@@ -1367,7 +1367,7 @@ add_action('wp_enqueue_scripts', function() {
 });
 
 add_action('enqueue_block_editor_assets', function() {
-    wp_register_script('sota-editor-js', '', ['wp-blocks','wp-element','wp-editor','wp-components'], '1.0.0', true);
+    wp_register_script('sota-editor-js', '', ['wp-blocks','wp-element','wp-block-editor','wp-editor','wp-components'], '1.1.5', true);
     wp_localize_script('sota-editor-js', 'sotaMagicAdmin', [
         'ajaxUrl' => admin_url('admin-ajax.php'),
         'nonce'   => wp_create_nonce('sota_magic_clear_location_cache'),
@@ -1376,7 +1376,7 @@ add_action('enqueue_block_editor_assets', function() {
         wp.blocks.registerBlockType('ki6cr/sota-data', {
             title: 'SOTA Activator Toolkit',
             icon: 'location-alt',
-            category: 'common',
+            category: 'text',
             attributes: {
                 gpxUrl: {type:'string'},
                 csvUrl: {type:'string'},
@@ -1429,13 +1429,12 @@ add_action('enqueue_block_editor_assets', function() {
                                 wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, '📍 GPS Track (.gpx)'),
                                 wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, 'The track file exported from your GPS device or app — Garmin, Gaia GPS, CalTopo, etc.')
                             ),
-                            wp.element.createElement(wp.editor.MediaUpload, {
+                            wp.element.createElement(wp.blockEditor.MediaUpload, {
                                 onSelect: function(media) { props.setAttributes({gpxUrl: media.url}); },
                                 allowedTypes: ['application/gpx+xml', 'text/xml'],
                                 render: function(obj) {
                                     return wp.element.createElement(wp.components.Button, {
-                                        isPrimary: !!props.attributes.gpxUrl,
-                                        isSecondary: !props.attributes.gpxUrl,
+                                        variant: props.attributes.gpxUrl ? 'primary' : 'secondary',
                                         onClick: obj.open,
                                         style:{flexShrink:'0', whiteSpace:'nowrap'}
                                     }, props.attributes.gpxUrl ? '✓ GPX Uploaded' : 'Upload GPX');
@@ -1447,7 +1446,7 @@ add_action('enqueue_block_editor_assets', function() {
                                 wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, '📋 Contacts Log (.csv or .adif)'),
                                 wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, 'Upload your SOTA formatted CSV or ADIF log file — the format is detected automatically.')
                             ),
-                            wp.element.createElement(wp.editor.MediaUpload, {
+                            wp.element.createElement(wp.blockEditor.MediaUpload, {
                                 onSelect: function(media) {
                                     var url = media.url;
                                     var ext = url.split('?')[0].split('.').pop().toLowerCase();
@@ -1472,8 +1471,7 @@ add_action('enqueue_block_editor_assets', function() {
                                 allowedTypes: ['text/csv', 'text/plain'],
                                 render: function(obj) {
                                     return wp.element.createElement(wp.components.Button, {
-                                        isPrimary: !!props.attributes.csvUrl,
-                                        isSecondary: !props.attributes.csvUrl,
+                                        variant: props.attributes.csvUrl ? 'primary' : 'secondary',
                                         onClick: obj.open,
                                         style:{flexShrink:'0', whiteSpace:'nowrap'}
                                     }, props.attributes.csvUrl ? '✓ Log Uploaded' : 'Upload Log File');
@@ -1543,11 +1541,11 @@ add_action('enqueue_block_editor_assets', function() {
                             }),
                             wp.element.createElement('div', {style:{display:'flex', gap:'8px', justifyContent:'flex-end'}},
                                 wp.element.createElement(wp.components.Button, {
-                                    isSecondary: true,
+                                    variant: 'secondary',
                                     onClick: function() { setShowSummitRefModal(false); }
                                 }, 'Skip for now'),
                                 wp.element.createElement(wp.components.Button, {
-                                    isPrimary: true,
+                                    variant: 'primary',
                                     onClick: function() {
                                         if (summitRefInput.trim()) { props.setAttributes({mySummitRef: summitRefInput.trim()}); }
                                         setShowSummitRefModal(false);
@@ -2253,7 +2251,7 @@ function sota_magic_render_sota_data($atts) {
         <?php endif; ?>
         <?php if ( $map_iframe_url && $csv_url ):
             if ( ! wp_script_is( 'sota-table-hover', 'registered' ) ) {
-                wp_register_script( 'sota-table-hover', '', [], '1.1.4', true );
+                wp_register_script( 'sota-table-hover', '', [], '1.1.5', true );
             }
             wp_enqueue_script( 'sota-table-hover' );
             $hover_js = '(function(){'

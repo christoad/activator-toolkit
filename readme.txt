@@ -2,8 +2,8 @@
 Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
-Tested up to: 6.9
-Stable tag: 1.1.4
+Tested up to: 7.0
+Stable tag: 1.1.5
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -147,6 +147,12 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.1.5 =
+* Improve: WordPress 7.0 compatibility — block editor uses current wp.blockEditor API instead of deprecated wp.editor for MediaUpload
+* Improve: Block editor buttons use current variant prop instead of deprecated isPrimary/isSecondary
+* Improve: Block category updated from deprecated 'common' to 'text'
+* Improve: Tested up to WordPress 7.0
 
 = 1.1.4 =
 * New: ADIF log file support — upload .adif or .adi files in addition to SOTA CSV; format is detected automatically
