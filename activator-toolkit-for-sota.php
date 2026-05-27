@@ -1287,6 +1287,12 @@ function sota_magic_parse_adif_contacts( $log_url, $summit_ref_override = '' ) {
         // Frequency: prefer <FREQ> (MHz), fall back to <BAND>
         $freq = sota_magic_adif_field( $record, 'freq' );
         if ( '' === $freq ) $freq = sota_magic_adif_field( $record, 'band' );
+        // Normalize MHz to min 3 / max 5 decimal places (144.2 → 144.200; 14.0675 → 14.0675); leave band labels alone
+        if ( is_numeric( $freq ) ) {
+            $parts   = explode( '.', $freq );
+            $decimal = isset( $parts[1] ) ? strlen( $parts[1] ) : 0;
+            $freq    = number_format( (float) $freq, max( 3, min( 5, $decimal ) ), '.', '' );
+        }
 
         $mode        = sota_magic_adif_field( $record, 'mode' );
         $my_sota_ref = sota_magic_adif_field( $record, 'my_sota_ref' );
