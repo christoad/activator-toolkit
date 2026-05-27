@@ -373,14 +373,15 @@ function sota_magic_settings_page() {
             <div id="sota-tab-lookup" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'lookup' ? '' : 'display:none;'; ?>">
                 <table class="form-table">
                     <tr><th colspan="2"><h2>How Contact Locations Are Determined</h2></th></tr>
-                    <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
-                        <strong>Priority order for locating each contact:</strong><br>
-                        1. <strong>Grid square in Comments field</strong> — plotted from Maidenhead grid, no lookup needed<br>
-                        2. <strong>Summit-to-Summit (S2S)</strong> — exact summit coordinates from the free SOTA API<br>
-                        3. <strong>Callook.info</strong> — automatic free lookup for US callsigns (FCC data, no account needed)<br>
-                        4. <strong>HamQTH</strong> — free account lookup, international coverage<br>
-                        5. <strong>QRZ.com</strong> — paid subscription lookup, international coverage<br>
-                        <br>Locations are cached permanently after the first lookup. A ham's address at the <em>time of your activation</em> is the historically accurate location — if they've since moved, the cached address is intentionally kept.
+                    <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px 14px;border-left:4px solid #0073aa;margin:10px 0;line-height:1.8;">
+                        <strong>How the plugin figures out where each contact was located:</strong><br>
+                        <strong>1. Summit-to-Summit (S2S)</strong> — if the log shows the other station was also on a summit, the plugin uses that summit&rsquo;s official coordinates from the SOTA database. No lookup needed.<br>
+                        <strong>2. Grid square in log file</strong> — if your logging app recorded a Maidenhead grid square for the contact (common in ADIF/.adi files), the plugin plots directly from that. No lookup needed.<br>
+                        <strong>3. Grid square in Comments</strong> — if you typed a grid square into the comments field of your log, the plugin uses that instead.<br>
+                        <strong>4. Callook.info</strong> — free automatic lookup for US callsigns using FCC data. No account or configuration needed.<br>
+                        <strong>5. HamQTH</strong> — free lookup for international callsigns. Requires a free HamQTH account (see below).<br>
+                        <strong>6. QRZ.com</strong> — international lookup. Requires a paid QRZ XML subscription (see below).<br>
+                        <br>Once a location is found it&rsquo;s saved permanently, so each callsign is only ever looked up once. The address at the <em>time of your activation</em> is kept intentionally — if they&rsquo;ve moved since, the cached location is still the historically accurate one.
                     </p></th></tr>
 
                     <tr><th colspan="2"><h2>Callook.info <span style="font-weight:normal;font-size:13px;color:#28a745;">&#10003; Free &mdash; no account needed</span></h2></th></tr>
@@ -1293,6 +1294,7 @@ function sota_magic_parse_adif_contacts( $log_url, $summit_ref_override = '' ) {
         $sota_ref    = sota_magic_adif_field( $record, 'sota_ref' );
         $comments    = sota_magic_adif_field( $record, 'comment' );
         if ( '' === $comments ) $comments = sota_magic_adif_field( $record, 'notes' );
+        $gridsquare  = sota_magic_adif_field( $record, 'gridsquare' );
 
         $contacts[] = [
             'my_summit'    => $my_sota_ref,
@@ -1303,6 +1305,7 @@ function sota_magic_parse_adif_contacts( $log_url, $summit_ref_override = '' ) {
             'callsign'     => strtoupper( $call ),
             'their_summit' => $sota_ref,
             'comments'     => $comments,
+            'gridsquare'   => $gridsquare,
         ];
     }
 
@@ -1522,15 +1525,7 @@ function sota_magic_contact_map_data_ajax() {
         $is_s2s     = ! empty( $contact['their_summit'] );
         $band_color = sota_magic_get_band_color( $contact['frequency'] );
 
-        // Priority 1: grid square in comments
-        $grid = sota_magic_extract_grid_square( $contact['comments'] );
-        if ( $grid ) {
-            $coords = sota_magic_maidenhead_to_latlon( $grid );
-            $contact_locations[] = [ 'callsign' => $callsign, 'lat' => $coords['lat'], 'lon' => $coords['lon'], 'summit' => $contact['their_summit'], 'mode' => $contact['mode'], 'frequency' => $contact['frequency'], 'is_s2s' => $is_s2s, 'color' => $band_color, 'location_source' => 'grid', 'grid' => $grid, 'cached' => true ];
-            continue;
-        }
-
-        // Priority 2: S2S — SOTA API summit coordinates
+        // Priority 1: S2S — SOTA API summit coordinates
         if ( $is_s2s ) {
             $their_ref = $contact['their_summit'];
             $s2s_key   = 'summit_' . sanitize_key( $their_ref );
@@ -1549,6 +1544,15 @@ function sota_magic_contact_map_data_ajax() {
                     } else { $unresolved[] = [ 'callsign' => $callsign, 'reason' => 'SOTA API returned no coordinates for ' . $their_ref ]; }
                 } else { $unresolved[] = [ 'callsign' => $callsign, 'reason' => 'SOTA API unreachable for ' . $their_ref ]; }
             }
+            continue;
+        }
+
+        // Priority 2: grid square — ADIF gridsquare field, then comments
+        $grid = sota_magic_extract_grid_square( $contact['gridsquare'] ?? '' )
+             ?? sota_magic_extract_grid_square( $contact['comments'] );
+        if ( $grid ) {
+            $coords = sota_magic_maidenhead_to_latlon( $grid );
+            $contact_locations[] = [ 'callsign' => $callsign, 'lat' => $coords['lat'], 'lon' => $coords['lon'], 'summit' => '', 'mode' => $contact['mode'], 'frequency' => $contact['frequency'], 'is_s2s' => false, 'color' => $band_color, 'location_source' => 'grid', 'grid' => $grid, 'cached' => true ];
             continue;
         }
 

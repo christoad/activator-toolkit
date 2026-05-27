@@ -148,6 +148,11 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 
 == Changelog ==
 
+= 1.1.6 =
+* Improve: Contact location lookup now checks ADIF gridsquare field before falling back to comments or callsign lookup services
+* Improve: Summit-to-Summit contacts are now prioritized first in location lookup hierarchy; grid square (ADIF field or comments) comes second; callsign lookup services are used only when no grid is available
+* Improve: Settings → Callsign Lookup tab now explains the full location lookup hierarchy in plain language
+
 = 1.1.5 =
 * Improve: WordPress 7.0 compatibility — block editor uses current wp.blockEditor API instead of deprecated wp.editor for MediaUpload
 * Improve: Block editor buttons use current variant prop instead of deprecated isPrimary/isSecondary
