@@ -3,7 +3,7 @@
  * Plugin Name: Activator Toolkit for Summits on the Air (SOTA)
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
- * Version: 1.1.5
+ * Version: 1.1.6
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
@@ -272,7 +272,12 @@ function sota_magic_settings_page() {
         update_option('sota_s2s_highlight', sanitize_hex_color(wp_unslash($_POST['sota_s2s_highlight'] ?? '')));
         update_option('sota_s2s_text_color', sanitize_hex_color(wp_unslash($_POST['sota_s2s_text_color'] ?? '')));
         update_option('sota_show_contact_map', isset($_POST['sota_show_contact_map']) ? 1 : 0);
-        update_option('sota_block_width', sanitize_text_field(wp_unslash($_POST['sota_block_width'] ?? '')));
+        $bw_raw = sanitize_text_field(wp_unslash($_POST['sota_block_width'] ?? ''));
+        if ($bw_raw === 'custom') {
+            $bw_raw = (string) absint(wp_unslash($_POST['sota_block_width_custom'] ?? ''));
+            if ($bw_raw === '0') $bw_raw = '';
+        }
+        update_option('sota_block_width', $bw_raw);
         update_option('sota_hamqth_username', sanitize_text_field(wp_unslash($_POST['sota_hamqth_username'] ?? '')));
         $sota_magic_hamqth_pass = wp_unslash($_POST['sota_hamqth_password'] ?? ''); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- password encrypted immediately
         if (!empty($sota_magic_hamqth_pass)) {
@@ -335,12 +340,31 @@ function sota_magic_settings_page() {
 
                     <tr><th colspan="2"><h2>Block Width</h2></th></tr>
                     <tr><th>Width</th><td>
-                        <select name="sota_block_width">
-                            <option value=""     <?php selected('',     get_option('sota_block_width')); ?>>Follow theme (default)</option>
-                            <option value="wide" <?php selected('wide', get_option('sota_block_width')); ?>>Wide — break out of content column</option>
-                            <option value="full" <?php selected('full', get_option('sota_block_width')); ?>>Full page width</option>
+                        <?php
+                        $bw_saved = get_option('sota_block_width', '');
+                        $bw_known = ['', 'wide', 'full', '700', '800', '900', '1000', '1100', '1200'];
+                        $bw_select_val = in_array($bw_saved, $bw_known, true) ? $bw_saved : (is_numeric($bw_saved) && $bw_saved !== '' ? 'custom' : $bw_saved);
+                        $bw_custom_val = ($bw_select_val === 'custom') ? $bw_saved : '';
+                        ?>
+                        <select name="sota_block_width" id="sota_block_width_select" onchange="sotaWidthChange(this.value)">
+                            <option value=""     <?php selected('',     $bw_select_val); ?>>Follow theme (default)</option>
+                            <option value="700"  <?php selected('700',  $bw_select_val); ?>>700px</option>
+                            <option value="800"  <?php selected('800',  $bw_select_val); ?>>800px</option>
+                            <option value="900"  <?php selected('900',  $bw_select_val); ?>>900px</option>
+                            <option value="1000" <?php selected('1000', $bw_select_val); ?>>1000px</option>
+                            <option value="1100" <?php selected('1100', $bw_select_val); ?>>1100px</option>
+                            <option value="1200" <?php selected('1200', $bw_select_val); ?>>1200px</option>
+                            <option value="wide" <?php selected('wide', $bw_select_val); ?>>Wide — break out of content column</option>
+                            <option value="full" <?php selected('full', $bw_select_val); ?>>Full page width</option>
+                            <option value="custom" <?php selected('custom', $bw_select_val); ?>>Custom…</option>
                         </select>
-                        <br><small>If the block looks too narrow, try <strong>Wide</strong> or <strong>Full page width</strong> to expand beyond the theme's content column. Wide targets ~1200px; Full uses the entire browser window.</small>
+                        <span id="sota_custom_width_wrap" style="display:<?php echo $bw_select_val === 'custom' ? 'inline-flex' : 'none'; ?>;align-items:center;gap:4px;margin-left:6px;">
+                            <input type="number" name="sota_block_width_custom" id="sota_block_width_custom"
+                                   value="<?php echo esc_attr($bw_custom_val); ?>"
+                                   min="400" max="2000" step="10" style="width:80px;" /> px
+                        </span>
+                        <script>function sotaWidthChange(v){document.getElementById('sota_custom_width_wrap').style.display=v==='custom'?'inline-flex':'none';}</script>
+                        <br><small>Choose a fixed pixel width, or use <strong>Wide</strong>/<strong>Full page width</strong> to use WordPress alignment classes that break out of the content column.</small>
                     </td></tr>
                 </table>
             </div>
@@ -1323,7 +1347,76 @@ add_action('wp_ajax_sota_magic_delete_single_location', function() {
     wp_send_json_success('Deleted.');
 });
 
-// AJAX: Serve the contact map iframe page
+// Contact map helper functions (shared by the HTML shell and data endpoint)
+
+function sota_magic_location_read( $cache_key ) {
+    global $wpdb;
+    // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
+    $table = esc_sql( $wpdb->prefix . 'sota_magic_locations' );
+    return $wpdb->get_row( $wpdb->prepare(
+        "SELECT lat, lon, label, source FROM $table WHERE cache_key = %s AND (expires_at IS NULL OR expires_at > NOW()) LIMIT 1",
+        $cache_key
+    ) );
+    // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
+}
+
+function sota_magic_location_write( $cache_key, $lat, $lon, $label, $source, $expires_seconds = 0 ) {
+    global $wpdb;
+    // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,PluginCheck.Security.DirectDB.UnescapedDBParameter
+    $table = esc_sql( $wpdb->prefix . 'sota_magic_locations' );
+    $wpdb->replace( $table, [
+        'cache_key'  => $cache_key,
+        'lat'        => $lat,
+        'lon'        => $lon,
+        'label'      => $label,
+        'source'     => $source,
+        'expires_at' => $expires_seconds > 0 ? gmdate( 'Y-m-d H:i:s', time() + $expires_seconds ) : null,
+        'cached_at'  => gmdate( 'Y-m-d H:i:s' ),
+    ] );
+    // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,PluginCheck.Security.DirectDB.UnescapedDBParameter
+}
+
+function sota_magic_extract_grid_square( $text ) {
+    if ( preg_match( '/(?<![A-Z0-9])([A-R]{2}[0-9]{2}[A-X]{2})(?![A-Z0-9])/i', $text, $m ) ) return strtoupper( $m[1] );
+    if ( preg_match( '/(?<![A-Z0-9])([A-R]{2}[0-9]{2})(?![A-Z0-9])/i',         $text, $m ) ) return strtoupper( $m[1] );
+    return null;
+}
+
+function sota_magic_maidenhead_to_latlon( $grid ) {
+    $g   = strtoupper( $grid );
+    $lon = ( ord( $g[0] ) - ord( 'A' ) ) * 20 - 180;
+    $lat = ( ord( $g[1] ) - ord( 'A' ) ) * 10 - 90;
+    $lon += ( ord( $g[2] ) - ord( '0' ) ) * 2;
+    $lat += ( ord( $g[3] ) - ord( '0' ) );
+    if ( strlen( $g ) >= 6 ) {
+        $lon += ( ord( $g[4] ) - ord( 'A' ) ) * ( 5.0 / 60 ) + ( 5.0 / 60 / 2 );
+        $lat += ( ord( $g[5] ) - ord( 'A' ) ) * ( 2.5 / 60 ) + ( 2.5 / 60 / 2 );
+    } else {
+        $lon += 1.0;
+        $lat += 0.5;
+    }
+    return [ 'lat' => round( $lat, 6 ), 'lon' => round( $lon, 6 ) ];
+}
+
+function sota_magic_get_band_color( $frequency ) {
+    $freq = floatval( $frequency );
+    if ( $freq >= 1.8   && $freq < 2.0   ) return '#8B4513';
+    if ( $freq >= 3.5   && $freq < 4.0   ) return '#FFA500';
+    if ( $freq >= 7.0   && $freq < 7.3   ) return '#FFD700';
+    if ( $freq >= 10.1  && $freq < 10.15 ) return '#FFFF00';
+    if ( $freq >= 14.0  && $freq < 14.35 ) return '#00FF00';
+    if ( $freq >= 18.068 && $freq < 18.168 ) return '#00CED1';
+    if ( $freq >= 21.0  && $freq < 21.45 ) return '#0000FF';
+    if ( $freq >= 24.89 && $freq < 24.99 ) return '#4B0082';
+    if ( $freq >= 28.0  && $freq < 29.7  ) return '#8B00FF';
+    if ( $freq >= 50.0  && $freq < 54.0  ) return '#FF1493';
+    if ( $freq >= 144.0 && $freq < 148.0 ) return '#FF69B4';
+    if ( $freq >= 222.0 && $freq < 225.0 ) return '#FFB6C1';
+    if ( $freq >= 420.0 && $freq < 450.0 ) return '#FFC0CB';
+    return '#999999';
+}
+
+// AJAX: Serve the contact map iframe page (HTML shell only — data loads asynchronously)
 function sota_magic_render_contact_map_ajax() {
     if ( ! isset( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_nonce'] ) ), 'sota_magic_contact_map' ) ) {
         wp_die( 'Invalid request.', '', [ 'response' => 403 ] );
@@ -1333,6 +1426,263 @@ function sota_magic_render_contact_map_ajax() {
 }
 add_action( 'wp_ajax_sota_magic_contact_map',        'sota_magic_render_contact_map_ajax' );
 add_action( 'wp_ajax_nopriv_sota_magic_contact_map', 'sota_magic_render_contact_map_ajax' );
+
+// AJAX: Return contact map data as JSON (called asynchronously by contact-map.js)
+function sota_magic_contact_map_data_ajax() {
+    if ( ! isset( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_nonce'] ) ), 'sota_magic_contact_map' ) ) {
+        wp_send_json( [ 'error' => 'Invalid nonce' ], 403 );
+    }
+
+    $debug_mode = ( isset( $_GET['debug'] ) && $_GET['debug'] === '1' );
+    $csv_url    = isset( $_GET['csv'] )        ? esc_url_raw( wp_unslash( $_GET['csv'] ) )               : '';
+    $log_format = isset( $_GET['format'] )     ? sanitize_key( wp_unslash( $_GET['format'] ) )            : 'csv';
+    $summit_ref = isset( $_GET['summit_ref'] ) ? sanitize_text_field( wp_unslash( $_GET['summit_ref'] ) ) : '';
+
+    if ( ! $csv_url ) {
+        wp_send_json( [ 'error' => 'No log file specified' ] );
+    }
+
+    $qrz_user    = get_option( 'sota_qrz_username' );
+    $qrz_pass    = sota_magic_decrypt_credential( get_option( 'sota_qrz_password' ) );
+    $hamqth_user = get_option( 'sota_hamqth_username' );
+    $hamqth_pass = sota_magic_decrypt_credential( get_option( 'sota_hamqth_password' ) );
+
+    // Parse log file
+    $contacts = [];
+    if ( $log_format === 'adif' ) {
+        $contacts = sota_magic_parse_adif_contacts( $csv_url, $summit_ref );
+    } else {
+        $csv_response = wp_remote_get( $csv_url, [ 'timeout' => 15 ] );
+        if ( ! is_wp_error( $csv_response ) ) {
+            $csv_body = wp_remote_retrieve_body( $csv_response );
+            foreach ( explode( "\n", $csv_body ) as $csv_line ) {
+                $row = str_getcsv( trim( $csv_line ) );
+                if ( ! empty( $row[0] ) && $row[0] === 'V2' ) {
+                    $contacts[] = [
+                        'my_summit'    => $row[2] ?? '',
+                        'date'         => $row[3] ?? '',
+                        'time'         => $row[4] ?? '',
+                        'frequency'    => $row[5] ?? '',
+                        'mode'         => $row[6] ?? '',
+                        'callsign'     => $row[7] ?? '',
+                        'their_summit' => trim( $row[8] ?? '' ),
+                        'comments'     => trim( $row[9] ?? '' ),
+                    ];
+                }
+            }
+        }
+    }
+
+    // Get summit location from SOTA API (cached 90 days)
+    $summit = null;
+    if ( ! empty( $contacts[0]['my_summit'] ) ) {
+        $summit_ref_val = $contacts[0]['my_summit'];
+        $summit_key     = 'summit_' . sanitize_key( $summit_ref_val );
+        $summit_row     = sota_magic_location_read( $summit_key );
+        if ( $summit_row ) {
+            $summit = [ 'lat' => floatval( $summit_row->lat ), 'lon' => floatval( $summit_row->lon ), 'name' => $summit_row->label ?: $summit_ref_val, 'ref' => $summit_ref_val ];
+        } else {
+            $api_url  = 'https://api2.sota.org.uk/api/summits/' . $summit_ref_val;
+            $wp_resp  = wp_remote_get( $api_url, [ 'timeout' => 30, 'user-agent' => 'SOTA-Magic-Plugin/1.0' ] );
+            $response = ! is_wp_error( $wp_resp ) ? wp_remote_retrieve_body( $wp_resp ) : false;
+            if ( $response !== false ) {
+                $summit_data = json_decode( $response, true );
+                if ( $summit_data && isset( $summit_data['latitude'], $summit_data['longitude'] ) ) {
+                    $summit_name = $summit_data['name'] ?? $summit_ref_val;
+                    $summit = [ 'lat' => floatval( $summit_data['latitude'] ), 'lon' => floatval( $summit_data['longitude'] ), 'name' => $summit_name, 'ref' => $summit_ref_val ];
+                    sota_magic_location_write( $summit_key, $summit['lat'], $summit['lon'], $summit_name, 'sota', 90 * DAY_IN_SECONDS );
+                }
+            }
+        }
+    }
+
+    // Get QRZ session
+    $qrz_session = null;
+    if ( $qrz_user && $qrz_pass ) {
+        $login_wp = wp_remote_get( 'https://xmldata.qrz.com/xml/current/?username=' . rawurlencode( $qrz_user ) . '&password=' . rawurlencode( $qrz_pass ), [ 'timeout' => 15 ] );
+        $login_body = ! is_wp_error( $login_wp ) ? wp_remote_retrieve_body( $login_wp ) : false;
+        if ( $login_body ) { preg_match( '/<Key>([^<]+)<\/Key>/', $login_body, $qrz_m ); if ( ! empty( $qrz_m[1] ) ) $qrz_session = $qrz_m[1]; }
+    }
+
+    // Get HamQTH session
+    $hamqth_session = null;
+    if ( $hamqth_user && $hamqth_pass ) {
+        $hamqth_login_wp   = wp_remote_get( 'https://www.hamqth.com/xml.php?u=' . rawurlencode( $hamqth_user ) . '&p=' . rawurlencode( $hamqth_pass ), [ 'timeout' => 15, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
+        $hamqth_login_body = ! is_wp_error( $hamqth_login_wp ) ? wp_remote_retrieve_body( $hamqth_login_wp ) : false;
+        if ( $hamqth_login_body ) { preg_match( '/<session_id>([^<]+)<\/session_id>/', $hamqth_login_body, $hqth_m ); if ( ! empty( $hqth_m[1] ) ) $hamqth_session = $hqth_m[1]; }
+    }
+
+    // Resolve contact locations
+    $contact_locations = [];
+    $unresolved        = [];
+    $lookup_fail_debug = [];
+
+    foreach ( $contacts as $contact ) {
+        $callsign   = $contact['callsign'];
+        $is_s2s     = ! empty( $contact['their_summit'] );
+        $band_color = sota_magic_get_band_color( $contact['frequency'] );
+
+        // Priority 1: grid square in comments
+        $grid = sota_magic_extract_grid_square( $contact['comments'] );
+        if ( $grid ) {
+            $coords = sota_magic_maidenhead_to_latlon( $grid );
+            $contact_locations[] = [ 'callsign' => $callsign, 'lat' => $coords['lat'], 'lon' => $coords['lon'], 'summit' => $contact['their_summit'], 'mode' => $contact['mode'], 'frequency' => $contact['frequency'], 'is_s2s' => $is_s2s, 'color' => $band_color, 'location_source' => 'grid', 'grid' => $grid, 'cached' => true ];
+            continue;
+        }
+
+        // Priority 2: S2S — SOTA API summit coordinates
+        if ( $is_s2s ) {
+            $their_ref = $contact['their_summit'];
+            $s2s_key   = 'summit_' . sanitize_key( $their_ref );
+            $s2s_row   = sota_magic_location_read( $s2s_key );
+            if ( $s2s_row ) {
+                $contact_locations[] = [ 'callsign' => $callsign, 'lat' => floatval( $s2s_row->lat ), 'lon' => floatval( $s2s_row->lon ), 'summit' => $their_ref, 'mode' => $contact['mode'], 'frequency' => $contact['frequency'], 'is_s2s' => true, 'color' => $band_color, 'location_source' => 'sota', 'cached' => true ];
+            } else {
+                $their_wp   = wp_remote_get( 'https://api2.sota.org.uk/api/summits/' . $their_ref, [ 'timeout' => 15, 'user-agent' => 'SOTA-Magic-Plugin/1.0' ] );
+                $their_body = ! is_wp_error( $their_wp ) ? wp_remote_retrieve_body( $their_wp ) : false;
+                if ( $their_body !== false ) {
+                    $their_data = json_decode( $their_body, true );
+                    if ( $their_data && isset( $their_data['latitude'], $their_data['longitude'] ) ) {
+                        $s2s_lat = floatval( $their_data['latitude'] ); $s2s_lon = floatval( $their_data['longitude'] );
+                        sota_magic_location_write( $s2s_key, $s2s_lat, $s2s_lon, $their_ref, 'sota', 90 * DAY_IN_SECONDS );
+                        $contact_locations[] = [ 'callsign' => $callsign, 'lat' => $s2s_lat, 'lon' => $s2s_lon, 'summit' => $their_ref, 'mode' => $contact['mode'], 'frequency' => $contact['frequency'], 'is_s2s' => true, 'color' => $band_color, 'location_source' => 'sota', 'cached' => false ];
+                    } else { $unresolved[] = [ 'callsign' => $callsign, 'reason' => 'SOTA API returned no coordinates for ' . $their_ref ]; }
+                } else { $unresolved[] = [ 'callsign' => $callsign, 'reason' => 'SOTA API unreachable for ' . $their_ref ]; }
+            }
+            continue;
+        }
+
+        // Priority 3: check unified cache (also check legacy qrz_ key)
+        $loc_key    = 'loc_' . sanitize_key( strtolower( $callsign ) );
+        $legacy_key = 'qrz_' . sanitize_key( strtolower( $callsign ) );
+        $cached_row = sota_magic_location_read( $loc_key ) ?? sota_magic_location_read( $legacy_key );
+        if ( $cached_row ) {
+            $contact_locations[] = [ 'callsign' => $callsign, 'lat' => floatval( $cached_row->lat ), 'lon' => floatval( $cached_row->lon ), 'summit' => '', 'mode' => $contact['mode'], 'frequency' => $contact['frequency'], 'is_s2s' => false, 'color' => $band_color, 'location_source' => $cached_row->source, 'cached' => true ];
+            continue;
+        }
+
+        $fail_reasons = [];
+
+        // Priority 4: Callook.info — free, US callsigns only
+        $callook_wp   = wp_remote_get( 'https://callook.info/' . rawurlencode( $callsign ) . '/json', [ 'timeout' => 10, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
+        $callook_body = ! is_wp_error( $callook_wp ) ? wp_remote_retrieve_body( $callook_wp ) : false;
+        if ( $callook_body ) {
+            $callook_data = json_decode( $callook_body, true );
+            if ( isset( $callook_data['status'] ) && $callook_data['status'] === 'VALID' && ! empty( $callook_data['location']['latitude'] ) && ! empty( $callook_data['location']['longitude'] ) ) {
+                $cl_lat = floatval( $callook_data['location']['latitude'] ); $cl_lon = floatval( $callook_data['location']['longitude'] );
+                sota_magic_location_write( $loc_key, $cl_lat, $cl_lon, $callsign, 'callook', 0 );
+                $contact_locations[] = [ 'callsign' => $callsign, 'lat' => $cl_lat, 'lon' => $cl_lon, 'summit' => '', 'mode' => $contact['mode'], 'frequency' => $contact['frequency'], 'is_s2s' => false, 'color' => $band_color, 'location_source' => 'callook', 'cached' => false ];
+                usleep( 250000 ); continue;
+            }
+            $fail_reasons[] = 'Callook: not a US callsign';
+        } else { $fail_reasons[] = 'Callook: request failed'; }
+
+        // Priority 5: HamQTH — free account, international
+        if ( $hamqth_session ) {
+            $hqth_wp   = wp_remote_get( 'https://www.hamqth.com/xml.php?id=' . rawurlencode( $hamqth_session ) . '&callsign=' . rawurlencode( $callsign ) . '&prg=Activator-Toolkit-for-SOTA', [ 'timeout' => 15, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
+            $hqth_body = ! is_wp_error( $hqth_wp ) ? wp_remote_retrieve_body( $hqth_wp ) : false;
+            if ( $hqth_body ) {
+                preg_match( '/<latitude>([^<]+)<\/latitude>/', $hqth_body, $hqth_lat_m );
+                preg_match( '/<longitude>([^<]+)<\/longitude>/', $hqth_body, $hqth_lon_m );
+                if ( ! empty( $hqth_lat_m[1] ) && ! empty( $hqth_lon_m[1] ) ) {
+                    $hq_lat = floatval( $hqth_lat_m[1] ); $hq_lon = floatval( $hqth_lon_m[1] );
+                    sota_magic_location_write( $loc_key, $hq_lat, $hq_lon, $callsign, 'hamqth', 0 );
+                    $contact_locations[] = [ 'callsign' => $callsign, 'lat' => $hq_lat, 'lon' => $hq_lon, 'summit' => '', 'mode' => $contact['mode'], 'frequency' => $contact['frequency'], 'is_s2s' => false, 'color' => $band_color, 'location_source' => 'hamqth', 'cached' => false ];
+                    usleep( 250000 ); continue;
+                }
+                $fail_reasons[] = 'HamQTH: no coordinates in response';
+                if ( $debug_mode ) $lookup_fail_debug[ $callsign ] = substr( $hqth_body, 0, 1000 );
+            } else { $fail_reasons[] = 'HamQTH: request failed'; }
+            usleep( 250000 );
+        } else { $fail_reasons[] = 'HamQTH: not configured'; }
+
+        // Priority 6: QRZ.com — paid subscription, international
+        if ( $qrz_session ) {
+            $qrz_wp   = wp_remote_get( 'https://xmldata.qrz.com/xml/current/?s=' . rawurlencode( $qrz_session ) . '&callsign=' . rawurlencode( $callsign ), [ 'timeout' => 15, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
+            $qrz_body = ! is_wp_error( $qrz_wp ) ? wp_remote_retrieve_body( $qrz_wp ) : false;
+            if ( $qrz_body ) {
+                preg_match( '/<lat>([^<]+)<\/lat>/', $qrz_body, $lat_m ); preg_match( '/<lon>([^<]+)<\/lon>/', $qrz_body, $lon_m );
+                if ( ! empty( $lat_m[1] ) && ! empty( $lon_m[1] ) ) {
+                    $qz_lat = floatval( $lat_m[1] ); $qz_lon = floatval( $lon_m[1] );
+                    sota_magic_location_write( $loc_key, $qz_lat, $qz_lon, $callsign, 'qrz', 0 );
+                    $contact_locations[] = [ 'callsign' => $callsign, 'lat' => $qz_lat, 'lon' => $qz_lon, 'summit' => '', 'mode' => $contact['mode'], 'frequency' => $contact['frequency'], 'is_s2s' => false, 'color' => $band_color, 'location_source' => 'qrz', 'cached' => false ];
+                    usleep( 500000 ); continue;
+                }
+                $fail_reasons[] = 'QRZ: no coordinates in response';
+                if ( $debug_mode ) $lookup_fail_debug[ $callsign ] = substr( $qrz_body, 0, 1000 );
+            } else { $fail_reasons[] = 'QRZ: request failed'; }
+            usleep( 500000 );
+        } else { $fail_reasons[] = 'QRZ: not configured'; }
+
+        $unresolved[] = [ 'callsign' => $callsign, 'reason' => implode( '; ', $fail_reasons ) ];
+    }
+
+    // Build the map contacts array
+    $map_contacts = [];
+    foreach ( $contact_locations as $loc ) {
+        $dist_miles = null; $dist_km = null;
+        if ( $summit ) {
+            $dist_m     = sota_magic_haversine_distance( $summit['lat'], $summit['lon'], $loc['lat'], $loc['lon'] );
+            $dist_km    = round( $dist_m / 1000, 1 );
+            $dist_miles = round( $dist_km * 0.621371, 1 );
+        }
+        $map_contacts[] = [
+            'lat'             => floatval( $loc['lat'] ),
+            'lon'             => floatval( $loc['lon'] ),
+            'callsign'        => $loc['callsign'],
+            's2s_summit'      => $loc['summit'] ?? null,
+            'frequency'       => $loc['frequency'],
+            'mode'            => $loc['mode'],
+            'color'           => $loc['color'],
+            'is_s2s'          => (bool) $loc['is_s2s'],
+            'location_source' => $loc['location_source'],
+            'grid'            => $loc['grid'] ?? null,
+            'dist_miles'      => $dist_miles,
+            'dist_km'         => $dist_km,
+            'cached'          => isset( $loc['cached'] ) ? (bool) $loc['cached'] : true,
+        ];
+    }
+
+    // Collect debug metadata
+    $debug_meta = null;
+    if ( $debug_mode ) {
+        $cached_count = 0; $fresh_count = 0;
+        foreach ( $contact_locations as $loc ) { if ( ! empty( $loc['cached'] ) ) $cached_count++; else $fresh_count++; }
+        global $wpdb;
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
+        $loc_table  = esc_sql( $wpdb->prefix . 'sota_magic_locations' );
+        $total_rows = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $loc_table" );
+        // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
+        $debug_meta = [
+            'summit_found'         => (bool) $summit,
+            'summit_ref'           => $summit ? $summit['ref']  : '',
+            'summit_lat'           => $summit ? $summit['lat']  : null,
+            'summit_lon'           => $summit ? $summit['lon']  : null,
+            'raw_contacts_count'   => count( $contacts ),
+            'first_my_summit'      => $contacts[0]['my_summit'] ?? '(empty)',
+            'resolved_count'       => count( $contact_locations ),
+            'lines_drawn'          => $summit ? count( $contact_locations ) : 0,
+            'cached_count'         => $cached_count,
+            'fresh_count'          => $fresh_count,
+            'unresolved_count'     => count( $unresolved ),
+            'locations_table'      => $wpdb->prefix . 'sota_magic_locations',
+            'locations_table_rows' => $total_rows,
+            'db_error'             => $wpdb->last_error ?: '',
+            'unresolved'           => $unresolved,
+            'lookup_fail_debug'    => $lookup_fail_debug,
+        ];
+    }
+
+    wp_send_json( [
+        'summit'     => $summit ? [ 'lat' => floatval( $summit['lat'] ), 'lon' => floatval( $summit['lon'] ), 'name' => $summit['name'], 'ref' => $summit['ref'] ] : null,
+        'contacts'   => $map_contacts,
+        'unresolved' => $unresolved,
+        'debug'      => $debug_mode,
+        'debug_meta' => $debug_meta,
+    ] );
+}
+add_action( 'wp_ajax_sota_magic_contact_map_data',        'sota_magic_contact_map_data_ajax' );
+add_action( 'wp_ajax_nopriv_sota_magic_contact_map_data', 'sota_magic_contact_map_data_ajax' );
 
 // Enqueue frontend stylesheet + dynamic color overrides
 add_action('wp_enqueue_scripts', function() {
@@ -1860,6 +2210,7 @@ function sota_magic_render_sota_data($atts) {
     $show_gpx_stats = get_option('sota_show_gpx_stats');
     $block_width = get_option('sota_block_width', '');
     $width_class = $block_width === 'wide' ? ' alignwide' : ( $block_width === 'full' ? ' alignfull' : '' );
+    $width_style = ( is_numeric($block_width) && (int)$block_width > 0 ) ? 'max-width:' . absint($block_width) . 'px;width:100%;' : '';
     $hide_stats_display = !empty($atts['hideGpxStats']);
     $unit_system = get_option('sota_unit_system', 'metric');
 
@@ -1985,7 +2336,7 @@ function sota_magic_render_sota_data($atts) {
 
     ob_start();
     ?>
-    <div class="sota-main-container<?php echo esc_attr( $width_class ); ?>">
+    <div class="sota-main-container<?php echo esc_attr( $width_class ); ?>"<?php if ( $width_style ) echo ' style="' . esc_attr( $width_style ) . '"'; ?>>
         <?php if ($gpx_url): ?>
             <h3><?php sota_magic_echo_svg('mountain', 22); ?> <?php echo esc_html(get_option('sota_headline_gpx')); ?></h3>
             <?php if (!empty($track_points)): ?>
@@ -2171,6 +2522,46 @@ function sota_magic_render_sota_data($atts) {
         <?php if ($csv_url): ?>
             <h3 style="margin-top:40px;"><?php sota_magic_echo_svg('antenna', 22); ?> <?php echo esc_html(get_option('sota_headline_csv')); ?></h3>
             <div class="sota-table-wrapper">
+                <?php
+                $table_contacts = [];
+                if ( $log_format === 'adif' ) {
+                    $table_contacts = sota_magic_parse_adif_contacts( $csv_url, $my_summit_ref );
+                } else {
+                    $csv_table_response = wp_remote_get($csv_url, ['timeout' => 15]);
+                    if (!is_wp_error($csv_table_response)) {
+                        $csv_table_body = wp_remote_retrieve_body($csv_table_response);
+                        foreach (explode("\n", $csv_table_body) as $csv_table_line) {
+                            $row = str_getcsv(trim($csv_table_line));
+                            if (empty($row[0]) || $row[0] !== 'V2') continue;
+                            $table_contacts[] = [
+                                'my_summit'    => $row[2] ?? '',
+                                'date'         => $row[3] ?? '',
+                                'time'         => $row[4] ?? '',
+                                'frequency'    => $row[5] ?? '',
+                                'mode'         => $row[6] ?? '',
+                                'callsign'     => $row[7] ?? '',
+                                'their_summit' => trim($row[8] ?? ''),
+                                'comments'     => trim($row[9] ?? ''),
+                            ];
+                        }
+                    }
+                }
+                usort($table_contacts, function($a, $b) {
+                    $to_sort_key = function($c) {
+                        $parts = explode('/', $c['date']);
+                        if (count($parts) === 3) {
+                            $y = (int)$parts[2]; $y = $y < 50 ? 2000 + $y : 1900 + $y;
+                            $date_key = sprintf('%04d%02d%02d', $y, (int)$parts[1], (int)$parts[0]);
+                        } else { $date_key = $c['date']; }
+                        return $date_key . str_replace(':', '', $c['time']);
+                    };
+                    return strcmp($to_sort_key($a), $to_sort_key($b));
+                });
+                $display_summit = $my_summit_ref ?: ( !empty($table_contacts[0]['my_summit']) ? $table_contacts[0]['my_summit'] : '' );
+                if ( $display_summit ) {
+                    echo '<p style="margin:0 0 8px 0;font-size:0.9em;color:#666;">My Summit: <strong>' . esc_html($display_summit) . '</strong></p>';
+                }
+                ?>
                 <table class="sota-table" id="sota-contact-table-<?php echo absint($sota_map_counter); ?>">
                     <thead>
                         <tr>
@@ -2179,47 +2570,12 @@ function sota_magic_render_sota_data($atts) {
                             <th>Callsign</th>
                             <th>Frequency</th>
                             <th>Mode</th>
-                            <th>My Summit</th>
                             <th>Their Summit</th>
                             <th>Comments</th>
                         </tr>
                     </thead>
                     <tbody>
                     <?php
-                    $table_contacts = [];
-                    if ( $log_format === 'adif' ) {
-                        $table_contacts = sota_magic_parse_adif_contacts( $csv_url, $my_summit_ref );
-                    } else {
-                        $csv_table_response = wp_remote_get($csv_url, ['timeout' => 15]);
-                        if (!is_wp_error($csv_table_response)) {
-                            $csv_table_body = wp_remote_retrieve_body($csv_table_response);
-                            foreach (explode("\n", $csv_table_body) as $csv_table_line) {
-                                $row = str_getcsv(trim($csv_table_line));
-                                if (empty($row[0]) || $row[0] !== 'V2') continue;
-                                $table_contacts[] = [
-                                    'my_summit'    => $row[2] ?? '',
-                                    'date'         => $row[3] ?? '',
-                                    'time'         => $row[4] ?? '',
-                                    'frequency'    => $row[5] ?? '',
-                                    'mode'         => $row[6] ?? '',
-                                    'callsign'     => $row[7] ?? '',
-                                    'their_summit' => trim($row[8] ?? ''),
-                                    'comments'     => trim($row[9] ?? ''),
-                                ];
-                            }
-                        }
-                    }
-                    usort($table_contacts, function($a, $b) {
-                        $to_sort_key = function($c) {
-                            $parts = explode('/', $c['date']);
-                            if (count($parts) === 3) {
-                                $y = (int)$parts[2]; $y = $y < 50 ? 2000 + $y : 1900 + $y;
-                                $date_key = sprintf('%04d%02d%02d', $y, (int)$parts[1], (int)$parts[0]);
-                            } else { $date_key = $c['date']; }
-                            return $date_key . str_replace(':', '', $c['time']);
-                        };
-                        return strcmp($to_sort_key($a), $to_sort_key($b));
-                    });
                     foreach ($table_contacts as $tc) {
                         $s2s = !empty($tc['their_summit']);
                         $csv_date = $tc['date']; // DD/MM/YY
@@ -2239,7 +2595,6 @@ function sota_magic_render_sota_data($atts) {
                         echo '<td><strong>' . esc_html($tc['callsign']) . '</strong>' . ($s2s ? '<span class="s2s-badge">S2S</span>' : '') . '</td>';
                         echo '<td>' . esc_html($tc['frequency']) . '</td>';
                         echo '<td>' . esc_html($tc['mode']) . '</td>';
-                        echo '<td>' . esc_html($tc['my_summit']) . '</td>';
                         echo '<td>' . esc_html($tc['their_summit']) . '</td>';
                         echo '<td>' . esc_html($tc['comments']) . '</td>';
                         echo '</tr>';

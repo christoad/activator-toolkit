@@ -3,7 +3,7 @@ Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 1.1.5
+Stable tag: 1.1.6
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -147,6 +147,11 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.1.6 =
+* Improve: Contact table now shows your summit reference as a subtitle above the table; "My Summit" column removed from individual rows to reduce clutter
+* Improve: Block Width setting now offers pixel presets (700–1200px) and a custom pixel input, in addition to the existing Wide and Full options
+* Improve: Contact map loading animation now appears immediately when the iframe loads; callsign lookups happen in the background instead of blocking the initial render
 
 = 1.1.5 =
 * Improve: WordPress 7.0 compatibility — block editor uses current wp.blockEditor API instead of deprecated wp.editor for MediaUpload
