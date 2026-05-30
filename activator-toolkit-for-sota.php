@@ -2575,8 +2575,7 @@ function sota_magic_render_sota_data($atts) {
                 <table class="sota-table" id="sota-contact-table-<?php echo absint($sota_map_counter); ?>">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Time</th>
+                            <th>Date / Time</th>
                             <th>Callsign</th>
                             <th>Frequency</th>
                             <th>Mode</th>
@@ -2600,8 +2599,7 @@ function sota_magic_render_sota_data($atts) {
                             $formatted_date = $csv_date;
                         }
                         echo '<tr class="' . ($s2s ? 's2s-row' : '') . '" data-callsign="' . esc_attr($tc['callsign']) . '">';
-                        echo '<td>' . esc_html($formatted_date) . '</td>';
-                        echo '<td>' . esc_html($tc['time']) . '</td>';
+                        echo '<td>' . esc_html($formatted_date) . '<br><span class="sota-contact-time">' . esc_html($tc['time']) . '</span></td>';
                         echo '<td><strong>' . esc_html($tc['callsign']) . '</strong>' . ($s2s ? '<span class="s2s-badge">S2S</span>' : '') . '</td>';
                         echo '<td>' . esc_html($tc['frequency']) . '</td>';
                         echo '<td>' . esc_html($tc['mode']) . '</td>';
