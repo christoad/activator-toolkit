@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Activator Toolkit for Summits on the Air (SOTA)
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
- * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. No other plugins required.
- * Version: 1.1.6
+ * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. Accepts SOTA CSV, ADIF, and ADI log files. No other plugins required.
+ * Version: 1.1.7
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later

@@ -3,7 +3,7 @@ Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 1.1.6
+Stable tag: 1.1.7
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -12,7 +12,7 @@ Display your SOTA activation beautifully — GPX maps, elevation charts, hiking 
 
 == Description ==
 
-Activator Toolkit for SOTA is a WordPress plugin for amateur radio operators participating in Summits On The Air (SOTA). Add the Activator Toolkit block to any post or page, upload your GPX track and SOTA CSV log, and the plugin automatically generates:
+Activator Toolkit for SOTA is a WordPress plugin for amateur radio operators participating in Summits On The Air (SOTA). Add the Activator Toolkit block to any post or page, upload your GPX track and activation log (SOTA CSV, ADIF, or ADI format), and the plugin automatically generates:
 
 * An interactive GPX track map with three selectable base layers (Topographic, OpenStreetMap, Minimal)
 * An elevation profile chart with hover-to-map interaction
@@ -33,6 +33,7 @@ Activator Toolkit for SOTA is a WordPress plugin for amateur radio operators par
 * **Intelligent Track Analysis** — Automatically calculates hiking time vs. activation time using the Activation.Zone API or a configurable radius fallback
 * **Rest Break Tracking** — Tracked separately and shown as a sub-note under hiking time
 * **Metric or Imperial Units** — Choose km/m/km/h or mi/ft/mph in settings
+* **Multiple Log Formats** — Accepts SOTA CSV v2, ADIF (.adif), and ADI (.adi) log files; format is detected automatically
 * **Contact Log Tables** — Responsive, horizontally-scrollable tables showing all contacts
 * **S2S Highlighting** — Automatic detection and custom color highlighting for Summit-to-Summit contacts
 * **Interactive Contact Map** — Shows contact locations by band, with lines to the summit; contacts with a grid square in Comments are plotted without any external service; S2S contacts use the free SOTA API; all other contacts use QRZ.com XML lookups (requires a QRZ XML subscription)
@@ -51,10 +52,12 @@ Queries api.activation.zone (by N6ARA) using your summit reference from the CSV 
 **Method 2: Radius Fallback (Automatic)**
 If the API is disabled or unavailable, the plugin draws a configurable circle (default 50m) around the highest GPS point. Configurable in Settings → Activator Toolkit for SOTA (20–200m).
 
-= CSV Format =
+= Supported Log Formats =
 
-The plugin expects SOTA CSV v2 format:
+**SOTA CSV v2** (the format exported from SOTA Logger apps and submitted to sota.org):
 `V2, MyCall, MySummit, Date (DD/MM/YY), Time, Frequency, Mode, TheirCall, TheirSummit, Comments`
+
+**ADIF / ADI** — Standard amateur radio log files exported from logging software such as WSJT-X, Log4OM, MacLoggerDX, and most others. Both `.adif` and `.adi` file extensions are accepted. The format is detected automatically — no configuration needed.
 
 = Requirements =
 
@@ -82,7 +85,7 @@ The plugin expects SOTA CSV v2 format:
 
 1. Go to Settings → Activator Toolkit for SOTA and configure your preferences
 2. In any post or page, add the "Activator Toolkit" block
-3. Upload your GPX file and/or SOTA CSV file
+3. Upload your GPX file and/or activation log (SOTA CSV, ADIF, or ADI format)
 4. Publish or preview — your activation data appears automatically
 
 == Frequently Asked Questions ==
@@ -112,6 +115,10 @@ The plugin automatically falls back to the radius method. Statistics are still c
 Only for the contact map's fallback location lookup. The contact map resolves locations in priority order: (1) Maidenhead grid squares in the Comments field — no QRZ needed; (2) S2S contacts via the free SOTA API — no QRZ needed; (3) all other contacts via the QRZ.com XML API.
 
 QRZ XML access requires a paid QRZ subscription — either the "XML Logbook Data" plan (~$35.95/year) or the Platinum plan. A free QRZ account does not include XML access. Contacts that cannot be located are shown in a "No location found" panel on the map rather than silently dropped.
+
+= What log file formats are supported? =
+
+SOTA CSV v2 (the format exported by SOTA Logger and submitted to sota.org), ADIF (.adif), and ADI (.adi). The format is detected automatically — just upload the file. If the file does not include a summit reference, the plugin will prompt you to enter one.
 
 = Can I use Maidenhead grid squares for contact locations? =
 
@@ -147,6 +154,9 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.1.7 =
+* Improve: Contacts table Date and Time merged into a single column; time displayed smaller and dimmed below the date for a cleaner layout
 
 = 1.1.6 =
 * Improve: Contact location lookup now checks ADIF gridsquare field before falling back to comments or callsign lookup services
