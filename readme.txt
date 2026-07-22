@@ -3,7 +3,7 @@ Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 1.1.7
+Stable tag: 1.1.8
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -154,6 +154,9 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.1.8 =
+* Fix: Log file uploads (.ADI/.ADIF) with uppercase extensions were rejected as an invalid file type; extension matching is now case-insensitive
 
 = 1.1.7 =
 * Improve: Contacts table Date and Time merged into a single column; time displayed smaller and dimmed below the date for a cleaner layout
