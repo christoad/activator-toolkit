@@ -840,7 +840,7 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
     // --- Step 1: Extract summit reference ---
     $summit_ref = null;
     if ( ! empty( $summit_ref_override ) ) {
-        $summit_ref = $summit_ref_override;
+        $summit_ref = strtoupper( $summit_ref_override );
     } elseif ( $csv_url ) {
         $csv_response = wp_remote_get( $csv_url, [ 'timeout' => 15 ] );
         if ( ! is_wp_error( $csv_response ) ) {
@@ -848,7 +848,7 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
             foreach ( explode( "\n", $csv_body ) as $csv_line ) {
                 $row = str_getcsv( trim( $csv_line ) );
                 if ( ! empty( $row[0] ) && $row[0] === 'V2' && ! empty( $row[2] ) ) {
-                    $summit_ref = $row[2];
+                    $summit_ref = strtoupper( $row[2] );
                     break;
                 }
             }
@@ -1295,9 +1295,9 @@ function sota_magic_parse_adif_contacts( $log_url, $summit_ref_override = '' ) {
         }
 
         $mode        = sota_magic_adif_field( $record, 'mode' );
-        $my_sota_ref = sota_magic_adif_field( $record, 'my_sota_ref' );
-        if ( '' === $my_sota_ref ) $my_sota_ref = $summit_ref_override;
-        $sota_ref    = sota_magic_adif_field( $record, 'sota_ref' );
+        $my_sota_ref = strtoupper( sota_magic_adif_field( $record, 'my_sota_ref' ) );
+        if ( '' === $my_sota_ref ) $my_sota_ref = strtoupper( $summit_ref_override );
+        $sota_ref    = strtoupper( sota_magic_adif_field( $record, 'sota_ref' ) );
         $comments    = sota_magic_adif_field( $record, 'comment' );
         if ( '' === $comments ) $comments = sota_magic_adif_field( $record, 'notes' );
         $gridsquare  = sota_magic_adif_field( $record, 'gridsquare' );
@@ -1468,13 +1468,13 @@ function sota_magic_contact_map_data_ajax() {
                 $row = str_getcsv( trim( $csv_line ) );
                 if ( ! empty( $row[0] ) && $row[0] === 'V2' ) {
                     $contacts[] = [
-                        'my_summit'    => $row[2] ?? '',
+                        'my_summit'    => strtoupper( $row[2] ?? '' ),
                         'date'         => $row[3] ?? '',
                         'time'         => $row[4] ?? '',
                         'frequency'    => $row[5] ?? '',
                         'mode'         => $row[6] ?? '',
                         'callsign'     => $row[7] ?? '',
-                        'their_summit' => trim( $row[8] ?? '' ),
+                        'their_summit' => strtoupper( trim( $row[8] ?? '' ) ),
                         'comments'     => trim( $row[9] ?? '' ),
                     ];
                 }
@@ -2200,7 +2200,7 @@ function sota_magic_render_sota_data($atts) {
     $gpx_url       = $atts['gpxUrl'] ?? '';
     $csv_url       = $atts['csvUrl'] ?? '';
     $log_format    = $atts['logFormat'] ?? 'csv';
-    $my_summit_ref = trim($atts['mySummitRef'] ?? '');
+    $my_summit_ref = strtoupper( trim($atts['mySummitRef'] ?? '') );
     if (!$gpx_url && !$csv_url) return '';
 
     // Manual override attributes (only applied when their Enabled flag is checked)
@@ -2544,13 +2544,13 @@ function sota_magic_render_sota_data($atts) {
                             $row = str_getcsv(trim($csv_table_line));
                             if (empty($row[0]) || $row[0] !== 'V2') continue;
                             $table_contacts[] = [
-                                'my_summit'    => $row[2] ?? '',
+                                'my_summit'    => strtoupper( $row[2] ?? '' ),
                                 'date'         => $row[3] ?? '',
                                 'time'         => $row[4] ?? '',
                                 'frequency'    => $row[5] ?? '',
                                 'mode'         => $row[6] ?? '',
                                 'callsign'     => $row[7] ?? '',
-                                'their_summit' => trim($row[8] ?? ''),
+                                'their_summit' => strtoupper( trim($row[8] ?? '') ),
                                 'comments'     => trim($row[9] ?? ''),
                             ];
                         }
