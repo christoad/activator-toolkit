@@ -1799,6 +1799,13 @@ add_action('enqueue_block_editor_assets', function() {
                                         style:{flexShrink:'0', whiteSpace:'nowrap'}
                                     }, props.attributes.gpxUrl ? '✓ GPX Uploaded' : 'Upload GPX');
                                 }
+                            }),
+                            props.attributes.gpxUrl && wp.element.createElement(wp.components.Button, {
+                                icon: 'trash',
+                                label: 'Remove GPX file',
+                                isSmall: true,
+                                onClick: function() { props.setAttributes({gpxUrl: ''}); },
+                                style:{flexShrink:'0', color:'\\x23999999'}
                             })
                         ),
                         wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', display:'flex', alignItems:'center', gap:'12px'}},
@@ -1836,6 +1843,13 @@ add_action('enqueue_block_editor_assets', function() {
                                         style:{flexShrink:'0', whiteSpace:'nowrap'}
                                     }, props.attributes.csvUrl ? '✓ Log Uploaded' : 'Upload Log File');
                                 }
+                            }),
+                            props.attributes.csvUrl && wp.element.createElement(wp.components.Button, {
+                                icon: 'trash',
+                                label: 'Remove log file',
+                                isSmall: true,
+                                onClick: function() { props.setAttributes({csvUrl: '', logFormat: 'csv'}); },
+                                style:{flexShrink:'0', color:'\\x23999999'}
                             })
                         )
                     ),
