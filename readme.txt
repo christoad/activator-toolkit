@@ -3,7 +3,7 @@ Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 1.1.8
+Stable tag: 1.1.9
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -154,6 +154,9 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.1.9 =
+* New: Small trash icon appears next to the GPX and log file upload boxes in the block editor once a file is attached, letting you clear just that file without deleting the whole block
 
 = 1.1.8 =
 * Fix: Log file uploads (.ADI/.ADIF) with uppercase extensions were rejected as an invalid file type; extension matching is now case-insensitive
