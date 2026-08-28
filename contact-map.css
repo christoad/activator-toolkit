@@ -2,6 +2,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: sans-serif; }
 #map { width: 100%; height: 100vh; }
+#map .leaflet-tile-pane { filter: grayscale(65%) brightness(1.08) contrast(0.95); }
 .popup-content { font-size: 13px; line-height: 1.6; }
 .popup-content strong { display: block; margin-bottom: 5px; font-size: 15px; color: #333; }
 .band-indicator {

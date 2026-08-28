@@ -35,9 +35,9 @@ $sota_cm_data_url = add_query_arg( [
 
 // Enqueue assets using WordPress APIs (required by WP.org — no raw <script>/<link> tags)
 wp_enqueue_style(  'sota-cm-leaflet',    plugins_url( 'lib/leaflet.css',  __FILE__ ), [],                       '1.9.4' );
-wp_enqueue_style(  'sota-cm-css',        plugins_url( 'contact-map.css',  __FILE__ ), [],                       '1.0.5' );
+wp_enqueue_style(  'sota-cm-css',        plugins_url( 'contact-map.css',  __FILE__ ), [],                       '1.0.6' );
 wp_enqueue_script( 'sota-cm-leaflet-js', plugins_url( 'lib/leaflet.js',   __FILE__ ), [],                       '1.9.4', false );
-wp_enqueue_script( 'sota-cm-js',         plugins_url( 'contact-map.js',   __FILE__ ), [ 'sota-cm-leaflet-js' ], '1.1.0', true );
+wp_enqueue_script( 'sota-cm-js',         plugins_url( 'contact-map.js',   __FILE__ ), [ 'sota-cm-leaflet-js' ], '1.1.1', true );
 wp_add_inline_script( 'sota-cm-js', 'var sotaContactMapParams = ' . wp_json_encode( [ 'dataUrl' => $sota_cm_data_url ] ) . ';', 'before' );
 ?>
 <!DOCTYPE html>

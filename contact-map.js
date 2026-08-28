@@ -28,8 +28,8 @@
         var mapZoom   = data.summit ? 6 : 4;
         var map = L.map( 'map' ).setView( mapCenter, mapZoom );
 
-        L.tileLayer( 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap contributors © CARTO',
+        L.tileLayer( 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
             maxZoom: 19
         } ).addTo( map );
 

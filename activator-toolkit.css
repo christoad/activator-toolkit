@@ -2,6 +2,12 @@
  * Static layout/structural rules; dynamic color overrides are added via wp_add_inline_style().
  */
 
+/* ── Map tile filters ────────────────────────────────────────────────────────
+ * "Minimal" layer reuses OSM tiles with a mute filter instead of a separate
+ * (API-key-gated) tile provider — see activator-toolkit-map.js.
+ */
+.sota-muted-tiles .leaflet-tile-pane { filter: grayscale(65%) brightness(1.08) contrast(0.95); }
+
 /* ── Typography ──────────────────────────────────────────────────────────────
  * Applied only within plugin elements; does not bleed into theme typography.
  * Falls back to the site's body font when sota_use_theme_font is checked.

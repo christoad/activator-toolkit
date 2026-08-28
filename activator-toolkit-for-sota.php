@@ -3,14 +3,14 @@
  * Plugin Name: Activator Toolkit for Summits on the Air (SOTA)
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. Accepts SOTA CSV, ADIF, and ADI log files. No other plugins required.
- * Version: 1.1.9
+ * Version: 1.1.10
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: activator-toolkit-for-sota
  * Requires at least: 6.0
- * Tested up to: 7.0
+ * Tested up to: 7.1
  * Requires PHP: 7.4
  */
 
@@ -106,7 +106,7 @@ function sota_magic_sanitize_unit_system( $value ) {
     return in_array( $value, [ 'metric', 'imperial' ], true ) ? $value : 'metric';
 }
 function sota_magic_sanitize_map_layer( $value ) {
-    return in_array( $value, [ 'topo', 'osm', 'carto' ], true ) ? $value : 'topo';
+    return in_array( $value, [ 'topo', 'osm', 'carto' ], true ) ? $value : 'carto';
 }
 function sota_magic_sanitize_password( $value ) {
     return $value; // stored encrypted; do not alter via settings API
@@ -240,7 +240,7 @@ add_action('admin_init', function() {
         'sota_use_azapi'              => [ 'absint',                         1 ],
         'sota_debug_mode'             => [ 'absint',                         0 ],
         'sota_debug_mode_public'      => [ 'absint',                         0 ],
-        'sota_default_map_layer'      => [ 'sota_magic_sanitize_map_layer',  'topo' ],
+        'sota_default_map_layer'      => [ 'sota_magic_sanitize_map_layer',  'carto' ],
     ];
     foreach ( $options as $key => [ $sanitize, $default ] ) {
         register_setting( 'sota_magic_group', $key, [ 'sanitize_callback' => $sanitize ] );
@@ -296,7 +296,7 @@ function sota_magic_settings_page() {
         update_option('sota_use_azapi', isset($_POST['sota_use_azapi']) ? 1 : 0);
         update_option('sota_debug_mode', isset($_POST['sota_debug_mode']) ? 1 : 0);
         update_option('sota_debug_mode_public', isset($_POST['sota_debug_mode_public']) ? 1 : 0);
-        update_option('sota_default_map_layer', sanitize_text_field(wp_unslash($_POST['sota_default_map_layer'] ?? 'topo')));
+        update_option('sota_default_map_layer', sanitize_text_field(wp_unslash($_POST['sota_default_map_layer'] ?? 'carto')));
         echo '<div class="notice notice-success is-dismissible"><p>Settings saved.</p></div>';
     }
     ?>
@@ -443,7 +443,7 @@ function sota_magic_settings_page() {
                         <select name="sota_default_map_layer">
                             <option value="topo" <?php selected('topo', get_option('sota_default_map_layer')); ?>>Topographic (OpenTopoMap)</option>
                             <option value="osm" <?php selected('osm', get_option('sota_default_map_layer')); ?>>OpenStreetMap</option>
-                            <option value="carto" <?php selected('carto', get_option('sota_default_map_layer')); ?>>Minimal (CartoDB)</option>
+                            <option value="carto" <?php selected('carto', get_option('sota_default_map_layer')); ?>>Minimal</option>
                         </select>
                         <br><small>Which base map layer loads by default on the GPX track map</small>
                     </td></tr>
@@ -1320,7 +1320,7 @@ function sota_magic_parse_adif_contacts( $log_url, $summit_ref_override = '' ) {
 
 // BLOCK REGISTRATION
 add_action('init', function() {
-    wp_register_style( 'activator-toolkit', plugins_url( 'activator-toolkit.css', __FILE__ ), [], '1.0.3' );
+    wp_register_style( 'activator-toolkit', plugins_url( 'activator-toolkit.css', __FILE__ ), [], '1.0.4' );
     register_block_type('ki6cr/sota-data', [
         'editor_script'   => 'sota-editor-js',
         'style'           => 'activator-toolkit',
@@ -2308,7 +2308,7 @@ function sota_magic_render_sota_data($atts) {
         wp_enqueue_style('sota-leaflet', plugins_url('lib/leaflet.css', __FILE__), [], '1.9.4');
         wp_enqueue_script('sota-leaflet-js', plugins_url('lib/leaflet.js', __FILE__), [], '1.9.4', true);
         wp_enqueue_script('sota-chartjs', plugins_url('lib/chart.umd.min.js', __FILE__), [], '4.5.1', true);
-        wp_enqueue_script('activator-toolkit-map', plugins_url('activator-toolkit-map.js', __FILE__), ['sota-leaflet-js', 'sota-chartjs'], '1.1.0', true);
+        wp_enqueue_script('activator-toolkit-map', plugins_url('activator-toolkit-map.js', __FILE__), ['sota-leaflet-js', 'sota-chartjs'], '1.1.1', true);
 
         // Build activation zone payload
         $az_data = null;
@@ -2343,7 +2343,7 @@ function sota_magic_render_sota_data($atts) {
             'activationZone' => $az_data,
             'units'          => $unit_system,
             'popupText'      => 'Summit / Activation Zone',
-            'defaultLayer'   => get_option('sota_default_map_layer', 'topo'),
+            'defaultLayer'   => get_option('sota_default_map_layer', 'carto'),
         ];
 
         wp_add_inline_script('activator-toolkit-map',

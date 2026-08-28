@@ -77,19 +77,30 @@ window.sotaMagicInitMap = function (mapId, data) {
         { attribution: 'Map data: &copy; OpenStreetMap contributors | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>', maxZoom: 17 }
     );
     var cartoLayer = L.tileLayer(
-        'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-        { attribution: '&copy; OpenStreetMap contributors &copy; <a href="https://carto.com">CARTO</a>', maxZoom: 19 }
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19 }
     );
 
     // Add default layer based on settings preference
     var defaultLayers = { topo: topoLayer, osm: osmLayer, carto: cartoLayer };
-    (defaultLayers[data.defaultLayer] || topoLayer).addTo(map);
+    var activeLayerKey = defaultLayers[data.defaultLayer] ? data.defaultLayer : 'topo';
+    defaultLayers[activeLayerKey].addTo(map);
 
     L.control.layers(
         { 'Topographic': topoLayer, 'OpenStreetMap': osmLayer, 'Minimal': cartoLayer },
         null,
         { position: 'topright', collapsed: true }
     ).addTo(map);
+
+    // "Minimal" reuses the OSM tiles above with a muted CSS filter (see activator-toolkit.css)
+    // instead of a separate tile provider, so the filter only applies while Minimal is active.
+    function setMutedTiles(isMinimal) {
+        map.getContainer().classList.toggle('sota-muted-tiles', isMinimal);
+    }
+    setMutedTiles(activeLayerKey === 'carto');
+    map.on('baselayerchange', function (e) {
+        setMutedTiles(e.name === 'Minimal');
+    });
 
     // ── GPX track polyline ────────────────────────────────────────────────────
     var latLngs  = pts.map(function (pt) { return [pt[0], pt[1]]; });

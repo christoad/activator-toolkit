@@ -2,8 +2,8 @@
 Contributors: creddick
 Tags: sota, amateur radio, ham radio, gpx, mapping
 Requires at least: 6.0
-Tested up to: 7.0
-Stable tag: 1.1.9
+Tested up to: 7.1
+Stable tag: 1.1.10
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -154,6 +154,11 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 6. Settings page
 
 == Changelog ==
+
+= 1.1.10 =
+* Fix: Replaced the "Minimal" map tile source (CartoDB), which began requiring an API key and showing an "API KEY REQUIRED" watermark, with OpenStreetMap tiles plus a muted CSS filter — same look, no API key needed. Affects both the Contact Map and the GPX map's Minimal layer.
+* Improve: "Minimal" is now the default map style for new plugin installs
+* Improve: Tested up to WordPress 7.1
 
 = 1.1.9 =
 * New: Small trash icon appears next to the GPX and log file upload boxes in the block editor once a file is attached, letting you clear just that file without deleting the whole block
