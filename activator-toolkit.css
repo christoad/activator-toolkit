@@ -133,10 +133,12 @@
     word-wrap: break-word;
     max-width: 300px;
 }
-.s2s-row td {
+.s2s-row td,
+.p2p-row td {
     font-weight: bold;
 }
-.s2s-badge {
+.s2s-badge,
+.p2p-badge {
     color: white;
     padding: 2px 7px;
     border-radius: 4px;

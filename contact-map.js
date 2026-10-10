@@ -1,4 +1,4 @@
-/* contact-map.js — SOTA Contact Map renderer
+/* contact-map.js — SOTA / POTA Contact Map renderer
  * Fetches map data from sotaContactMapParams.dataUrl, then renders the Leaflet map.
  * The HTML shell (loading animation) is already visible before this script runs.
  */
@@ -33,31 +33,41 @@
             maxZoom: 19
         } ).addTo( map );
 
-        var summitIcon = L.divIcon( {
-            html:       '<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#CC2200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20L12 4L21 20H3Z"/><path d="M9 20L12 13L15 17"/></svg></div>',
-            className:  'summit-icon',
-            iconSize:   [ 32, 32 ],
-            iconAnchor: [ 16, 16 ]
-        } );
+        var summitSvg = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#CC2200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20L12 4L21 20H3Z"/><path d="M9 20L12 13L15 17"/></svg>';
+        var parkSvg   = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3L6 12H9L5 18H11V21H13V18H19L15 12H18L12 3Z"/></svg>';
 
-        if ( data.summit ) {
-            var summitMarker = L.marker( [ data.summit.lat, data.summit.lon ], { icon: summitIcon } ).addTo( map );
-            summitMarker.bindPopup(
-                '<div class="popup-content"><strong>🏔️ ' +
-                data.summit.name + '</strong>' + data.summit.ref +
+        function originIcon( kind ) {
+            return L.divIcon( {
+                html:       '<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));">' + ( kind === 'park' ? parkSvg : summitSvg ) + '</div>',
+                className:  'summit-icon',
+                iconSize:   [ 32, 32 ],
+                iconAnchor: [ 16, 16 ]
+            } );
+        }
+
+        function addOrigin( o ) {
+            var kind = o.kind || 'summit';
+            var m = L.marker( [ o.lat, o.lon ], { icon: originIcon( kind ) } ).addTo( map );
+            m.bindPopup(
+                '<div class="popup-content"><strong>' + ( kind === 'park' ? '🌳 ' : '🏔️ ' ) +
+                o.name + '</strong>' + o.ref +
                 '<br><em>Your Activation</em></div>'
             );
         }
 
+        if ( data.summit ) addOrigin( data.summit );
+        ( data.extra_origins || [] ).forEach( addOrigin );
+
         var allPoints         = [];
         var markersByCallsign = {};
         if ( data.summit ) allPoints.push( [ data.summit.lat, data.summit.lon ] );
+        ( data.extra_origins || [] ).forEach( function ( o ) { allPoints.push( [ o.lat, o.lon ] ); } );
 
         data.contacts.forEach( function ( c ) {
             var contactCircle = L.circleMarker( [ c.lat, c.lon ], {
-                radius:      c.is_s2s ? 8 : 6,
+                radius:      ( c.is_s2s || c.is_p2p ) ? 8 : 6,
                 fillColor:   c.color,
-                color:       c.is_s2s ? '#000' : '#fff',
+                color:       ( c.is_s2s || c.is_p2p ) ? '#000' : '#fff',
                 weight:      2,
                 opacity:     1,
                 fillOpacity: 0.9
@@ -67,6 +77,10 @@
             if ( c.s2s_summit ) {
                 popupHtml += '<br>📡 ' + c.s2s_summit +
                     ' <span style="background:#ff9800;color:white;padding:2px 6px;border-radius:3px;font-size:11px;">S2S</span>';
+            }
+            if ( c.is_p2p && c.p2p_park ) {
+                popupHtml += '<br>🌳 ' + c.p2p_park +
+                    ' <span style="background:#2e7d32;color:white;padding:2px 6px;border-radius:3px;font-size:11px;">P2P</span>';
             }
             popupHtml += '<br><span class="band-indicator" style="background-color:' + c.color + ';"></span>' +
                 c.frequency + ' MHz - ' + c.mode;
@@ -93,6 +107,44 @@
             if ( ! markersByCallsign[ c.callsign ] ) markersByCallsign[ c.callsign ] = [];
             markersByCallsign[ c.callsign ].push( contactCircle );
         } );
+
+        // Furthest contact tile (distance is measured from the summit or park)
+        var furthest = null;
+        data.contacts.forEach( function ( c ) {
+            if ( c.dist_km !== null && ( ! furthest || c.dist_km > furthest.dist_km ) ) furthest = c;
+        } );
+        if ( furthest ) {
+            var FurthestControl = L.Control.extend( {
+                options: { position: 'topright' },
+                onAdd: function () {
+                    var div = L.DomUtil.create( 'div', '' );
+                    div.style.cssText = 'background:white;border-radius:6px;padding:8px 12px;font-size:12px;' +
+                        'font-family:sans-serif;box-shadow:0 1px 5px rgba(0,0,0,0.3);line-height:1.5;cursor:pointer;text-align:center;';
+                    var label = document.createElement( 'div' );
+                    label.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#777;';
+                    label.textContent = 'Furthest contact';
+                    var call = document.createElement( 'div' );
+                    call.style.cssText = 'font-size:16px;font-weight:700;color:#222;';
+                    call.textContent = furthest.callsign;
+                    var dist = document.createElement( 'div' );
+                    dist.style.cssText = 'color:#444;';
+                    dist.textContent = furthest.dist_miles + ' mi / ' + furthest.dist_km + ' km';
+                    div.appendChild( label );
+                    div.appendChild( call );
+                    div.appendChild( dist );
+                    L.DomEvent.disableClickPropagation( div );
+                    L.DomEvent.on( div, 'click', function () {
+                        var m = markersByCallsign[ furthest.callsign ];
+                        if ( m && m.length > 0 ) {
+                            map.panTo( m[ 0 ].getLatLng() );
+                            m[ 0 ].openPopup();
+                        }
+                    } );
+                    return div;
+                }
+            } );
+            new FurthestControl().addTo( map );
+        }
 
         function fitAllPoints() {
             if ( allPoints.length > 1 ) {
@@ -152,14 +204,16 @@
         div.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#fff3cd;border-top:2px solid #ffc107;' +
             'padding:8px 12px;font-size:11px;font-family:monospace;z-index:99999;max-height:35vh;overflow-y:auto;';
 
+        var isPark = meta.program === 'pota';
+        var originWord = isPark ? 'Park' : 'Summit';
         var html = '<strong>🔍 Contact Map Debug (admin only)</strong><br>';
-        html += 'Summit found: <strong>' + ( meta.summit_found
-            ? 'YES — ' + meta.summit_ref + ' (' + meta.summit_lat + ', ' + meta.summit_lon + ')'
-            : 'NO (API returned nothing)' ) + '</strong><br>';
+        html += originWord + ' found: <strong>' + ( meta.summit_found
+            ? 'YES - ' + meta.summit_ref + ' (' + meta.summit_lat + ', ' + meta.summit_lon + ')'
+            : 'NO (' + ( isPark ? 'POTA' : 'SOTA' ) + ' lookup returned nothing)' ) + '</strong><br>';
         html += 'Raw contacts parsed: <strong>' + meta.raw_contacts_count + '</strong> &nbsp;|&nbsp; ';
-        html += 'First my_summit: <strong>' + meta.first_my_summit + '</strong><br>';
+        html += 'First my_' + originWord.toLowerCase() + ': <strong>' + meta.first_my_summit + '</strong><br>';
         html += 'Resolved: <strong>' + meta.resolved_count + '</strong> &nbsp;|&nbsp; ';
-        html += 'Lines drawn: <strong>' + ( meta.lines_drawn > 0 ? meta.lines_drawn : 'NONE — summit was null' ) + '</strong><br>';
+        html += 'Lines drawn: <strong>' + ( meta.lines_drawn > 0 ? meta.lines_drawn : 'NONE - ' + originWord.toLowerCase() + ' was not found' ) + '</strong><br>';
         html += 'Cache hits: <strong>' + meta.cached_count + '</strong> &nbsp;|&nbsp; ';
         html += 'Fresh lookups: <strong>' + meta.fresh_count + '</strong> &nbsp;|&nbsp; ';
         html += 'Unresolved: <strong>' + meta.unresolved_count + '</strong><br>';

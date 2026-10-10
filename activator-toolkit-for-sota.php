@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Activator Toolkit for Summits on the Air and Parks on the Air
+ * Plugin Name: Activator Toolkit for SOTA & POTA
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
  * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. Accepts SOTA CSV, ADIF, and ADI log files. No other plugins required.
  * Version: 1.1.10
@@ -15,6 +15,10 @@
  */
 
 if (!defined('ABSPATH')) exit;
+
+define('SOTA_MAGIC_PLUGIN_FILE', __FILE__);
+require_once plugin_dir_path(__FILE__) . 'includes/pota.php';
+require_once plugin_dir_path(__FILE__) . 'includes/settings-page.php';
 
 // Create (or upgrade) the locations cache table
 function sota_magic_create_locations_table() {
@@ -104,6 +108,9 @@ function sota_magic_sanitize_float( $value ) {
 }
 function sota_magic_sanitize_unit_system( $value ) {
     return in_array( $value, [ 'metric', 'imperial' ], true ) ? $value : 'metric';
+}
+function sota_magic_sanitize_program( $value ) {
+    return $value === 'pota' ? 'pota' : 'sota';
 }
 function sota_magic_sanitize_map_layer( $value ) {
     return in_array( $value, [ 'topo', 'osm', 'carto' ], true ) ? $value : 'carto';
@@ -212,7 +219,7 @@ function sota_magic_echo_svg( $name, $size = 20 ) {
 
 // SETTINGS
 add_action('admin_menu', function() {
-    add_options_page('Activator Toolkit for SOTA Settings', 'Activator Toolkit for SOTA', 'manage_options', 'activator-toolkit-settings', 'sota_magic_settings_page');
+    add_options_page('Activator Toolkit Settings', 'Activator Toolkit', 'manage_options', 'activator-toolkit-settings', 'sota_magic_settings_page');
 });
 
 add_action('admin_init', function() {
@@ -241,329 +248,15 @@ add_action('admin_init', function() {
         'sota_debug_mode'             => [ 'absint',                         0 ],
         'sota_debug_mode_public'      => [ 'absint',                         0 ],
         'sota_default_map_layer'      => [ 'sota_magic_sanitize_map_layer',  'carto' ],
+        'sota_default_program'        => [ 'sota_magic_sanitize_program',    'sota' ],
+        'pota_p2p_highlight'          => [ 'sanitize_hex_color',             '#e8f5e9' ],
+        'pota_p2p_text_color'         => [ 'sanitize_hex_color',             '#2e7d32' ],
     ];
     foreach ( $options as $key => [ $sanitize, $default ] ) {
         register_setting( 'sota_magic_group', $key, [ 'sanitize_callback' => $sanitize ] );
         if ( get_option( $key ) === false ) update_option( $key, $default );
     }
 });
-
-function sota_magic_settings_page() {
-    if (!current_user_can('manage_options')) return;
-
-    $sota_magic_valid_tabs = ['display', 'lookup', 'gpx', 'developer', 'cache'];
-    $sota_current_tab = 'display';
-    if (isset($_POST['sota_magic_save'])) {
-        $sota_current_tab = sanitize_key($_POST['sota_active_tab'] ?? 'display');
-    } elseif (isset($_GET['tab'])) {
-        $sota_current_tab = sanitize_key($_GET['tab']);
-    }
-    if (!in_array($sota_current_tab, $sota_magic_valid_tabs, true)) $sota_current_tab = 'display';
-
-    if (isset($_POST['sota_magic_save'])) {
-        check_admin_referer('sota_magic_settings');
-        update_option('sota_headline_gpx', sanitize_text_field(wp_unslash($_POST['sota_headline_gpx'] ?? '')));
-        update_option('sota_headline_csv', sanitize_text_field(wp_unslash($_POST['sota_headline_csv'] ?? '')));
-        update_option('sota_headline_map', sanitize_text_field(wp_unslash($_POST['sota_headline_map'] ?? '')));
-        update_option('sota_bg_color', sanitize_hex_color(wp_unslash($_POST['sota_bg_color'] ?? '')));
-        update_option('sota_text_color', sanitize_hex_color(wp_unslash($_POST['sota_text_color'] ?? '')));
-        update_option('sota_is_transparent', isset($_POST['sota_is_transparent']) ? 1 : 0);
-        update_option('sota_use_theme_font', isset($_POST['sota_use_theme_font']) ? 1 : 0);
-        update_option('sota_s2s_highlight', sanitize_hex_color(wp_unslash($_POST['sota_s2s_highlight'] ?? '')));
-        update_option('sota_s2s_text_color', sanitize_hex_color(wp_unslash($_POST['sota_s2s_text_color'] ?? '')));
-        update_option('sota_show_contact_map', isset($_POST['sota_show_contact_map']) ? 1 : 0);
-        $bw_raw = sanitize_text_field(wp_unslash($_POST['sota_block_width'] ?? ''));
-        if ($bw_raw === 'custom') {
-            $bw_raw = (string) absint(wp_unslash($_POST['sota_block_width_custom'] ?? ''));
-            if ($bw_raw === '0') $bw_raw = '';
-        }
-        update_option('sota_block_width', $bw_raw);
-        update_option('sota_hamqth_username', sanitize_text_field(wp_unslash($_POST['sota_hamqth_username'] ?? '')));
-        $sota_magic_hamqth_pass = wp_unslash($_POST['sota_hamqth_password'] ?? ''); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- password encrypted immediately
-        if (!empty($sota_magic_hamqth_pass)) {
-            update_option('sota_hamqth_password', sota_magic_encrypt_credential($sota_magic_hamqth_pass));
-        }
-        update_option('sota_qrz_username', sanitize_text_field(wp_unslash($_POST['sota_qrz_username'] ?? '')));
-        $sota_magic_new_pass = wp_unslash($_POST['sota_qrz_password'] ?? ''); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- password is immediately encrypted; no sanitizer can run without corrupting special characters
-        if (!empty($sota_magic_new_pass)) {
-            update_option('sota_qrz_password', sota_magic_encrypt_credential($sota_magic_new_pass));
-        }
-        update_option('sota_show_gpx_stats', isset($_POST['sota_show_gpx_stats']) ? 1 : 0);
-        update_option('sota_stationary_threshold', sanitize_text_field(wp_unslash($_POST['sota_stationary_threshold'] ?? '')));
-        update_option('sota_unit_system', sanitize_text_field(wp_unslash($_POST['sota_unit_system'] ?? '')));
-        update_option('sota_activation_zone_radius', sanitize_text_field(wp_unslash($_POST['sota_activation_zone_radius'] ?? '')));
-        update_option('sota_rest_threshold_minutes', sanitize_text_field(wp_unslash($_POST['sota_rest_threshold_minutes'] ?? '')));
-        update_option('sota_use_azapi', isset($_POST['sota_use_azapi']) ? 1 : 0);
-        update_option('sota_debug_mode', isset($_POST['sota_debug_mode']) ? 1 : 0);
-        update_option('sota_debug_mode_public', isset($_POST['sota_debug_mode_public']) ? 1 : 0);
-        update_option('sota_default_map_layer', sanitize_text_field(wp_unslash($_POST['sota_default_map_layer'] ?? 'carto')));
-        echo '<div class="notice notice-success is-dismissible"><p>Settings saved.</p></div>';
-    }
-    ?>
-    <div class="wrap">
-        <h1><img src="<?php echo esc_url(plugins_url('lib/activator-toolkit-logo.svg', __FILE__)); ?>" alt="Activator Toolkit for SOTA" style="height:48px;vertical-align:middle;margin-right:10px;">Activator Toolkit for SOTA Settings</h1>
-        <?php $sota_magic_data = get_plugin_data( __FILE__ ); ?>
-        <p style="font-size:12px;color:#666;"><em>Created by KI6CR &mdash; Version <?php echo esc_html( $sota_magic_data['Version'] ); ?></em></p>
-
-        <h2 class="nav-tab-wrapper">
-            <a href="#" data-tab="display"    class="nav-tab <?php echo $sota_current_tab === 'display'    ? 'nav-tab-active' : ''; ?>">Display</a>
-            <a href="#" data-tab="lookup"     class="nav-tab <?php echo $sota_current_tab === 'lookup'     ? 'nav-tab-active' : ''; ?>">Callsign Lookup</a>
-            <a href="#" data-tab="gpx"        class="nav-tab <?php echo $sota_current_tab === 'gpx'        ? 'nav-tab-active' : ''; ?>">GPX Track</a>
-            <a href="#" data-tab="developer"  class="nav-tab <?php echo $sota_current_tab === 'developer'  ? 'nav-tab-active' : ''; ?>">Developer</a>
-            <a href="#" data-tab="cache"      class="nav-tab <?php echo $sota_current_tab === 'cache'      ? 'nav-tab-active' : ''; ?>">Cache</a>
-        </h2>
-
-        <form method="post" action="">
-            <input type="hidden" name="sota_active_tab" id="sota_active_tab" value="<?php echo esc_attr($sota_current_tab); ?>">
-            <?php wp_nonce_field('sota_magic_settings'); ?>
-
-            <!-- Tab: Display -->
-            <div id="sota-tab-display" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'display' ? '' : 'display:none;'; ?>">
-                <table class="form-table">
-                    <tr><th colspan="2"><h2>Headlines</h2></th></tr>
-                    <tr><th>GPX Headline</th><td><input type="text" name="sota_headline_gpx" value="<?php echo esc_attr(get_option('sota_headline_gpx')); ?>" class="regular-text" /></td></tr>
-                    <tr><th>CSV Headline</th><td><input type="text" name="sota_headline_csv" value="<?php echo esc_attr(get_option('sota_headline_csv')); ?>" class="regular-text" /></td></tr>
-                    <tr><th>Map Headline</th><td><input type="text" name="sota_headline_map" value="<?php echo esc_attr(get_option('sota_headline_map')); ?>" class="regular-text" /></td></tr>
-
-                    <tr><th colspan="2"><h2>Colors</h2></th></tr>
-                    <tr><th>Background</th><td><input type="color" name="sota_bg_color" value="<?php echo esc_attr(get_option('sota_bg_color')); ?>" /></td></tr>
-                    <tr><th>Text</th><td><input type="color" name="sota_text_color" value="<?php echo esc_attr(get_option('sota_text_color')); ?>" /></td></tr>
-                    <tr><th>Transparent BG</th><td><input type="checkbox" name="sota_is_transparent" value="1" <?php checked(1, get_option('sota_is_transparent')); ?> /></td></tr>
-                    <tr><th>Use Theme Font</th><td><input type="checkbox" name="sota_use_theme_font" value="1" <?php checked(1, get_option('sota_use_theme_font')); ?> /></td></tr>
-
-                    <tr><th colspan="2"><h2>S2S Highlighting</h2></th></tr>
-                    <tr><th>S2S Background</th><td><input type="color" name="sota_s2s_highlight" value="<?php echo esc_attr(get_option('sota_s2s_highlight')); ?>" /></td></tr>
-                    <tr><th>S2S Text</th><td><input type="color" name="sota_s2s_text_color" value="<?php echo esc_attr(get_option('sota_s2s_text_color')); ?>" /></td></tr>
-
-                    <tr><th colspan="2"><h2>Contact Map</h2></th></tr>
-                    <tr><th>Show Contact Map</th><td><input type="checkbox" name="sota_show_contact_map" value="1" <?php checked(1, get_option('sota_show_contact_map')); ?> /></td></tr>
-
-                    <tr><th colspan="2"><h2>Block Width</h2></th></tr>
-                    <tr><th>Width</th><td>
-                        <?php
-                        $bw_saved = get_option('sota_block_width', '');
-                        $bw_known = ['', 'wide', 'full', '700', '800', '900', '1000', '1100', '1200'];
-                        $bw_select_val = in_array($bw_saved, $bw_known, true) ? $bw_saved : (is_numeric($bw_saved) && $bw_saved !== '' ? 'custom' : $bw_saved);
-                        $bw_custom_val = ($bw_select_val === 'custom') ? $bw_saved : '';
-                        ?>
-                        <select name="sota_block_width" id="sota_block_width_select" onchange="sotaWidthChange(this.value)">
-                            <option value=""     <?php selected('',     $bw_select_val); ?>>Follow theme (default)</option>
-                            <option value="700"  <?php selected('700',  $bw_select_val); ?>>700px</option>
-                            <option value="800"  <?php selected('800',  $bw_select_val); ?>>800px</option>
-                            <option value="900"  <?php selected('900',  $bw_select_val); ?>>900px</option>
-                            <option value="1000" <?php selected('1000', $bw_select_val); ?>>1000px</option>
-                            <option value="1100" <?php selected('1100', $bw_select_val); ?>>1100px</option>
-                            <option value="1200" <?php selected('1200', $bw_select_val); ?>>1200px</option>
-                            <option value="wide" <?php selected('wide', $bw_select_val); ?>>Wide — break out of content column</option>
-                            <option value="full" <?php selected('full', $bw_select_val); ?>>Full page width</option>
-                            <option value="custom" <?php selected('custom', $bw_select_val); ?>>Custom…</option>
-                        </select>
-                        <span id="sota_custom_width_wrap" style="display:<?php echo $bw_select_val === 'custom' ? 'inline-flex' : 'none'; ?>;align-items:center;gap:4px;margin-left:6px;">
-                            <input type="number" name="sota_block_width_custom" id="sota_block_width_custom"
-                                   value="<?php echo esc_attr($bw_custom_val); ?>"
-                                   min="400" max="2000" step="10" style="width:80px;" /> px
-                        </span>
-                        <script>function sotaWidthChange(v){document.getElementById('sota_custom_width_wrap').style.display=v==='custom'?'inline-flex':'none';}</script>
-                        <br><small>Choose a fixed pixel width, or use <strong>Wide</strong>/<strong>Full page width</strong> to use WordPress alignment classes that break out of the content column.</small>
-                    </td></tr>
-                </table>
-            </div>
-
-            <!-- Tab: Callsign Lookup -->
-            <div id="sota-tab-lookup" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'lookup' ? '' : 'display:none;'; ?>">
-                <table class="form-table">
-                    <tr><th colspan="2"><h2>How Contact Locations Are Determined</h2></th></tr>
-                    <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px 14px;border-left:4px solid #0073aa;margin:10px 0;line-height:1.8;">
-                        <strong>How the plugin figures out where each contact was located:</strong><br>
-                        <strong>1. Summit-to-Summit (S2S)</strong> — if the log shows the other station was also on a summit, the plugin uses that summit&rsquo;s official coordinates from the SOTA database. No lookup needed.<br>
-                        <strong>2. Grid square in log file</strong> — if your logging app recorded a Maidenhead grid square for the contact (common in ADIF/.adi files), the plugin plots directly from that. No lookup needed.<br>
-                        <strong>3. Grid square in Comments</strong> — if you typed a grid square into the comments field of your log, the plugin uses that instead.<br>
-                        <strong>4. Callook.info</strong> — free automatic lookup for US callsigns using FCC data. No account or configuration needed.<br>
-                        <strong>5. HamQTH</strong> — free lookup for international callsigns. Requires a free HamQTH account (see below).<br>
-                        <strong>6. QRZ.com</strong> — international lookup. Requires a paid QRZ XML subscription (see below).<br>
-                        <br>Once a location is found it&rsquo;s saved permanently, so each callsign is only ever looked up once. The address at the <em>time of your activation</em> is kept intentionally — if they&rsquo;ve moved since, the cached location is still the historically accurate one.
-                    </p></th></tr>
-
-                    <tr><th colspan="2"><h2>Callook.info <span style="font-weight:normal;font-size:13px;color:#28a745;">&#10003; Free &mdash; no account needed</span></h2></th></tr>
-                    <tr><th colspan="2"><p style="color:#555;padding:0 0 10px;">Callook.info serves US callsigns from FCC data. It runs automatically for every contact — no configuration needed. Non-US callsigns fall through to HamQTH or QRZ.</p></th></tr>
-
-                    <tr><th colspan="2"><h2>HamQTH <span style="font-weight:normal;font-size:13px;color:#0073aa;">Free account required</span></h2></th></tr>
-                    <tr><th>HamQTH Username</th><td>
-                        <input type="text" name="sota_hamqth_username" value="<?php echo esc_attr(get_option('sota_hamqth_username')); ?>" class="regular-text" />
-                        <br><small>Your HamQTH.com callsign. <a href="https://www.hamqth.com/register.php" target="_blank">Register free at HamQTH.com</a> — no paid subscription required. Provides international callsign location data.</small>
-                    </td></tr>
-                    <tr><th>HamQTH Password</th><td>
-                        <input type="password" name="sota_hamqth_password" value="" placeholder="<?php echo get_option('sota_hamqth_password') ? esc_attr('(saved — leave blank to keep current password)') : ''; ?>" class="regular-text" />
-                        <br><small>Your HamQTH.com password. Leave blank to keep the current saved password.</small>
-                    </td></tr>
-
-                    <tr><th colspan="2"><h2>QRZ.com <span style="font-weight:normal;font-size:13px;color:#888;">Paid XML subscription required</span></h2></th></tr>
-                    <tr><th>QRZ Username</th><td>
-                        <input type="text" name="sota_qrz_username" value="<?php echo esc_attr(get_option('sota_qrz_username')); ?>" class="regular-text" />
-                        <br><small>Your QRZ.com callsign. <strong>Requires a QRZ XML subscription</strong> — a free QRZ account does not include XML access. <a href="https://www.qrz.com/page/xml_data.html" target="_blank">Learn more at QRZ.com</a>.</small>
-                    </td></tr>
-                    <tr><th>QRZ Password</th><td>
-                        <input type="password" name="sota_qrz_password" value="" placeholder="<?php echo get_option('sota_qrz_password') ? esc_attr('(saved — leave blank to keep current password)') : ''; ?>" class="regular-text" />
-                        <br><small>Your QRZ.com password. Leave blank to keep the current saved password.</small>
-                    </td></tr>
-
-                </table>
-            </div>
-
-            <!-- Tab: GPX Track -->
-            <div id="sota-tab-gpx" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'gpx' ? '' : 'display:none;'; ?>">
-                <table class="form-table">
-                    <tr><th colspan="2"><h2>Activation Zone</h2></th></tr>
-                    <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
-                        <strong>How Hiking vs. Activation Time is Calculated:</strong><br>
-                        The plugin can use two methods to determine the activation zone:<br>
-                        <strong>1. Activation.Zone API (Recommended):</strong> Queries api.activation.zone for the precise activation zone based on terrain elevation data (25m vertical drop per SOTA rules). Most accurate!<br>
-                        <strong>2. Fallback Method:</strong> Uses a simple radius around the highest GPS point. Used automatically if the API is unavailable or disabled.<br><br>
-                        <strong>All time spent within the activation zone counts as activation time</strong> (regardless of movement). All other time counts as hiking time, with rest breaks shown as a sub-note.
-                    </p></th></tr>
-                    <tr><th>Use Activation.Zone API</th><td>
-                        <input type="checkbox" name="sota_use_azapi" value="1" <?php checked(1, get_option('sota_use_azapi')); ?> />
-                        <br><small>Query <a href="https://activation.zone" target="_blank">activation.zone</a> (by N6ARA) for precise activation zone geometry based on terrain data. If disabled or API fails, falls back to radius method.</small>
-                    </td></tr>
-                    <tr><th>Activation Zone Radius</th><td>
-                        <input type="number" name="sota_activation_zone_radius" value="<?php echo esc_attr(get_option('sota_activation_zone_radius')); ?>" step="10" min="20" max="200" style="width:80px;" /> meters
-                        <br><small>Used as fallback if Activation.Zone API is disabled or unavailable (default: 50m)</small>
-                    </td></tr>
-
-                    <tr><th colspan="2"><h2>Display &amp; Units</h2></th></tr>
-                    <tr><th>Show GPX Statistics</th><td><input type="checkbox" name="sota_show_gpx_stats" value="1" <?php checked(1, get_option('sota_show_gpx_stats')); ?> /><br><small>Display hiking time, activation time, and other statistics</small></td></tr>
-                    <tr><th>Unit System</th><td>
-                        <select name="sota_unit_system">
-                            <option value="metric" <?php selected('metric', get_option('sota_unit_system')); ?>>Metric (km, m, km/h)</option>
-                            <option value="imperial" <?php selected('imperial', get_option('sota_unit_system')); ?>>Imperial (mi, ft, mph)</option>
-                        </select>
-                        <br><small>Choose how distances and speeds are displayed</small>
-                    </td></tr>
-                    <tr><th>Default Map Layer</th><td>
-                        <select name="sota_default_map_layer">
-                            <option value="topo" <?php selected('topo', get_option('sota_default_map_layer')); ?>>Topographic (OpenTopoMap)</option>
-                            <option value="osm" <?php selected('osm', get_option('sota_default_map_layer')); ?>>OpenStreetMap</option>
-                            <option value="carto" <?php selected('carto', get_option('sota_default_map_layer')); ?>>Minimal</option>
-                        </select>
-                        <br><small>Which base map layer loads by default on the GPX track map</small>
-                    </td></tr>
-
-                    <tr><th colspan="2"><h2>Track Analysis</h2></th></tr>
-                    <tr><th>Rest Break Threshold</th><td>
-                        <input type="number" name="sota_rest_threshold_minutes" value="<?php echo esc_attr(get_option('sota_rest_threshold_minutes')); ?>" step="1" min="1" max="30" style="width:80px;" /> minutes
-                        <br><small>Minimum duration to count as a rest break. Short stops (photos, water) won't count. (default: 3 min)</small>
-                    </td></tr>
-                    <tr><th>Stationary Speed Threshold</th><td>
-                        <input type="number" name="sota_stationary_threshold" value="<?php echo esc_attr(get_option('sota_stationary_threshold')); ?>" step="0.1" min="0.1" max="2.0" style="width:80px;" /> km/h
-                        <br><small>Speed below this is considered stationary (default: 0.3 km/h)</small>
-                    </td></tr>
-                </table>
-            </div>
-
-            <!-- Tab: Developer -->
-            <div id="sota-tab-developer" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'developer' ? '' : 'display:none;'; ?>">
-                <table class="form-table">
-                    <tr><th colspan="2"><h2>Debug Mode</h2></th></tr>
-                    <tr><th>Debug Mode (admin only)</th><td>
-                        <input type="checkbox" name="sota_debug_mode" value="1" <?php checked(1, get_option('sota_debug_mode')); ?> />
-                        <br><small>Shows technical debug panels <strong>visible only to logged-in admins</strong>. Safe to leave on without affecting public visitors. Enables two panels:
-                        <br>• <strong>GPX stats page</strong> — API response details, polygon vertex count, points-in-zone count, and speed ranges
-                        <br>• <strong>Contact map</strong> — summit lookup result, contacts resolved, per-contact location source, and lines-drawn count</small>
-                    </td></tr>
-                    <tr><th>Debug Mode (public)</th><td>
-                        <input type="checkbox" name="sota_debug_mode_public" value="1" <?php checked(1, get_option('sota_debug_mode_public')); ?> />
-                        <br><small>Same debug panels as above but <strong>visible to all visitors</strong> — use temporarily when testing while logged out. Disable when done.</small>
-                    </td></tr>
-                </table>
-            </div>
-
-            <!-- Tab: Cache -->
-            <div id="sota-tab-cache" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'cache' ? '' : 'display:none;'; ?>">
-                <?php
-                global $wpdb;
-                $sota_cache_table = $wpdb->prefix . 'sota_magic_locations';
-                // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-                $sota_cache_table_safe = esc_sql( $sota_cache_table );
-                $sota_cached_entries = $wpdb->get_results( "SELECT cache_key, lat, lon, source, cached_at FROM {$sota_cache_table_safe} WHERE source != 'sota' ORDER BY cache_key ASC" ); // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name sanitized via esc_sql()
-                // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-                $sota_cache_count = count( $sota_cached_entries );
-                ?>
-                <p style="margin:12px 0 16px;">When your contact map loads, the plugin looks up each callsign&rsquo;s location via QRZ, Callook, or HamQTH and stores the result locally. This means each callsign is only ever looked up once &mdash; subsequent map loads are instant and don&rsquo;t count against your API quota. Locations are cached permanently so the map reflects where each station was at the time of your activation, even if they&rsquo;ve moved since.</p>
-                <p style="background:#e8f5e9;padding:10px;border-left:4px solid #28a745;margin:10px 0;">
-                    <strong>&#10003; Changes on this page take effect immediately</strong> &mdash; no Save button needed. Deleting an entry or clearing all cached locations happens the moment you click.
-                </p>
-                <h2>Cached Callsign Locations</h2>
-                <p id="sota-cache-count"><?php echo esc_html( $sota_cache_count ); ?> callsign location(s) cached.</p>
-
-                <?php if ( $sota_cache_count > 0 ) : ?>
-                <p><input type="text" id="sota-cache-search" placeholder="Filter by callsign&hellip;" class="regular-text" autocomplete="off" /></p>
-                <table class="widefat striped" id="sota-cache-table">
-                    <thead>
-                        <tr>
-                            <th>Callsign</th>
-                            <th>Source</th>
-                            <th>Lat / Lon</th>
-                            <th>Cached</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php
-                    $sota_source_labels = [ 'callook' => 'Callook', 'hamqth' => 'HamQTH', 'qrz' => 'QRZ' ];
-                    foreach ( $sota_cached_entries as $sota_entry ) :
-                        $sota_callsign = preg_replace( '/^(loc_|qrz_)/', '', $sota_entry->cache_key );
-                        $sota_cached_date = $sota_entry->cached_at ? gmdate( 'Y-m-d', strtotime( $sota_entry->cached_at ) ) : '—';
-                    ?>
-                        <tr data-callsign="<?php echo esc_attr( strtolower( $sota_callsign ) ); ?>">
-                            <td><strong><?php echo esc_html( strtoupper( $sota_callsign ) ); ?></strong></td>
-                            <td><?php echo esc_html( $sota_source_labels[ $sota_entry->source ] ?? $sota_entry->source ); ?></td>
-                            <td><?php echo esc_html( number_format( (float) $sota_entry->lat, 4 ) ); ?>, <?php echo esc_html( number_format( (float) $sota_entry->lon, 4 ) ); ?></td>
-                            <td><?php echo esc_html( $sota_cached_date ); ?></td>
-                            <td><button type="button" class="button button-small sota-delete-cache-entry" data-cache-key="<?php echo esc_attr( $sota_entry->cache_key ); ?>">Delete</button></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-                <p id="sota-no-cache-results" style="display:none;color:#999;margin-top:6px;">No entries match your filter.</p>
-                <?php else : ?>
-                <p style="color:#999;">No callsign locations are currently cached.</p>
-                <?php endif; ?>
-
-                <hr style="margin:30px 0;">
-                <h2>Clear All Cached Locations</h2>
-                <p class="description" style="color:#c0392b;margin-bottom:10px;"><strong>&#9888; Nuclear option:</strong> Wipes all cached callsign locations site-wide. The next time any contact map loads, every non-grid, non-S2S contact will trigger a fresh lookup. Only use this if you believe cached locations are incorrect.</p>
-                <button type="button" id="sota-clear-cache-btn" class="button button-secondary">Clear All Cached Locations</button>
-                <p id="sota-clear-cache-result" style="margin-top:6px;font-weight:bold;display:none;"></p>
-            </div>
-
-            <?php submit_button('Save Settings', 'primary', 'sota_magic_save'); ?>
-        </form>
-    </div>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var tabs = document.querySelectorAll('.nav-tab[data-tab]');
-        var activeInput = document.getElementById('sota_active_tab');
-        var submitRow = document.querySelector('p.submit');
-        function toggleSubmit(tabName) {
-            if (submitRow) submitRow.style.display = tabName === 'cache' ? 'none' : '';
-        }
-        toggleSubmit(activeInput ? activeInput.value : 'display');
-        tabs.forEach(function(tab) {
-            tab.addEventListener('click', function(e) {
-                e.preventDefault();
-                var t = this.dataset.tab;
-                activeInput.value = t;
-                tabs.forEach(function(el) { el.classList.remove('nav-tab-active'); });
-                this.classList.add('nav-tab-active');
-                document.querySelectorAll('.sota-tab-panel').forEach(function(p) { p.style.display = 'none'; });
-                document.getElementById('sota-tab-' + t).style.display = '';
-                toggleSubmit(t);
-            });
-        });
-    });
-    </script>
-    <?php
-}
 
 /**
  * Query activation.zone API for summit activation zone polygon
@@ -732,6 +425,115 @@ function sota_magic_get_activation_zone_from_api($summit_ref, $summit_lat, $summ
 }
 
 /**
+ * Activation zone cache (wp_options, custom expiry, autoload off).
+ * Returns the cached 'data' (an array; empty array means "known to have no polygon") or null on a miss.
+ */
+function sota_magic_az_cache_read( $key ) {
+    $entry = get_option( $key );
+    if ( is_array( $entry ) && isset( $entry['expires'] ) && time() < $entry['expires'] ) {
+        return $entry['data'];
+    }
+    return null;
+}
+
+function sota_magic_az_cache_write( $key, $data, $ttl ) {
+    update_option( $key, [ 'data' => $data, 'expires' => time() + $ttl ], false );
+}
+
+/**
+ * SOTLAS high-precision (~1m) terrain-derived activation zone (az.sotl.as).
+ * Returns [ 'polygon' => GeoJSON coordinates|null, 'debug' => string ].
+ * The storage behind az.sotl.as answers HTTP 403 (not 404) when a summit has no polygon,
+ * so any non-200 response counts as "not available". Hits are cached 365 days, misses 30 days
+ * because SOTLAS keeps adding boundaries for more associations.
+ */
+function sota_magic_get_sotlas_zone( $summit_ref ) {
+    $summit_ref = strtoupper( trim( $summit_ref ) );
+    $cache_key  = 'sota_magic_azsl_' . sanitize_key( $summit_ref );
+    $cached     = sota_magic_az_cache_read( $cache_key );
+    if ( $cached !== null ) {
+        return $cached
+            ? [ 'polygon' => $cached, 'debug' => 'SOTLAS: loaded from cache' ]
+            : [ 'polygon' => null,    'debug' => 'SOTLAS: no boundary for this summit (checked recently)' ];
+    }
+
+    // W6/CT-014 -> assoc W6, region CT, number 014 (the "/" is part of the ref, never encode the whole ref)
+    $parts = explode( '/', $summit_ref, 2 );
+    $rest  = isset( $parts[1] ) ? explode( '-', $parts[1], 2 ) : [];
+    if ( count( $parts ) !== 2 || count( $rest ) !== 2 ) {
+        return [ 'polygon' => null, 'debug' => 'SOTLAS: summit reference not in ASSOC/REGION-NUMBER form' ];
+    }
+    $url = 'https://az.sotl.as/' . rawurlencode( $parts[0] ) . '/' . rawurlencode( $rest[0] ) . '/' . rawurlencode( $rest[1] ) . '.geojson';
+
+    $response = wp_remote_get( $url, [
+        'timeout'    => 15,
+        'user-agent' => 'Activator-Toolkit-for-SOTA/1.0 (WordPress plugin; +https://wordpress.org/plugins/activator-toolkit-for-sota)',
+        'headers'    => [ 'Accept' => 'application/json' ],
+    ] );
+    if ( is_wp_error( $response ) ) {
+        return [ 'polygon' => null, 'debug' => 'SOTLAS: request failed (' . $response->get_error_message() . ')' ]; // not cached, may be temporary
+    }
+    if ( 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+        sota_magic_az_cache_write( $cache_key, [], 30 * DAY_IN_SECONDS );
+        return [ 'polygon' => null, 'debug' => 'SOTLAS: no boundary available (HTTP ' . (int) wp_remote_retrieve_response_code( $response ) . ')' ];
+    }
+
+    $data   = json_decode( wp_remote_retrieve_body( $response ), true );
+    $coords = $data['geometry']['coordinates']
+        ?? $data['coordinates']
+        ?? $data['features'][0]['geometry']['coordinates']
+        ?? null;
+    // MultiPolygon: keep the first polygon (coordinates nested one level deeper)
+    if ( is_array( $coords ) && isset( $coords[0][0][0] ) && is_array( $coords[0][0][0] ) ) $coords = $coords[0];
+    if ( ! is_array( $coords ) || ! isset( $coords[0][0] ) ) {
+        sota_magic_az_cache_write( $cache_key, [], 30 * DAY_IN_SECONDS );
+        return [ 'polygon' => null, 'debug' => 'SOTLAS: response contained no usable polygon' ];
+    }
+
+    sota_magic_az_cache_write( $cache_key, $coords, 365 * DAY_IN_SECONDS );
+    return [ 'polygon' => $coords, 'debug' => 'SOTLAS: high-precision boundary fetched (' . count( $coords[0] ) . ' points), cached 365 days' ];
+}
+
+/**
+ * Find the best activation zone polygon for a summit.
+ *
+ * @param string $mode 'auto' (SOTLAS, then Activation.Zone), 'sotlas', or 'activation_zone'.
+ *                     When nothing is found the caller falls back to the radius circle.
+ * @return array [ 'polygon' => array|null, 'source' => 'sotlas'|'activation_zone'|'', 'debug' => string ]
+ */
+function sota_magic_resolve_activation_zone( $summit_ref, $summit_lat, $summit_lon, $summit_alt, $mode = 'auto' ) {
+    $debug = [];
+
+    if ( 'auto' === $mode || 'sotlas' === $mode ) {
+        $sotlas  = sota_magic_get_sotlas_zone( $summit_ref );
+        $debug[] = $sotlas['debug'];
+        if ( $sotlas['polygon'] ) {
+            return [ 'polygon' => $sotlas['polygon'], 'source' => 'sotlas', 'debug' => implode( ' | ', $debug ) ];
+        }
+    }
+
+    if ( 'auto' === $mode || 'activation_zone' === $mode ) {
+        $cache_key = 'sota_magic_az_' . sanitize_key( $summit_ref );
+        $cached    = sota_magic_az_cache_read( $cache_key );
+        if ( $cached ) {
+            $debug[] = 'Activation.Zone: loaded from cache';
+            return [ 'polygon' => $cached, 'source' => 'activation_zone', 'debug' => implode( ' | ', $debug ) ];
+        }
+        $api_result = sota_magic_get_activation_zone_from_api( $summit_ref, $summit_lat, $summit_lon, $summit_alt );
+        if ( is_array( $api_result ) ) {
+            $debug[] = 'Activation.Zone: ' . $api_result['debug'];
+            if ( ! empty( $api_result['polygon'] ) ) {
+                sota_magic_az_cache_write( $cache_key, $api_result['polygon'], 365 * DAY_IN_SECONDS );
+                return [ 'polygon' => $api_result['polygon'], 'source' => 'activation_zone', 'debug' => implode( ' | ', $debug ) ];
+            }
+        }
+    }
+
+    $debug[] = 'Using radius circle';
+    return [ 'polygon' => null, 'source' => '', 'debug' => implode( ' | ', $debug ) ];
+}
+
+/**
  * Check if a point is inside a polygon using ray casting algorithm
  * @param float $lat Point latitude
  * @param float $lon Point longitude
@@ -780,7 +582,7 @@ function sota_magic_point_in_polygon($lat, $lon, $polygon) {
  * Analyze GPX track to determine hiking vs stationary time
  * Uses hybrid approach: activation.zone API (if enabled) or radius fallback
  */
-function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false, $summit_ref_override = null) {
+function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius = false, $summit_ref_override = null, $zone_mode = 'auto') {
     $stationary_threshold = floatval(get_option('sota_stationary_threshold', 0.3)); // km/h
     $activation_zone_radius = floatval(get_option('sota_activation_zone_radius', 50)); // meters
     $rest_threshold_minutes = floatval(get_option('sota_rest_threshold_minutes', 10)); // minutes
@@ -880,47 +682,18 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
     $using_api = false;
     $api_debug_message = 'Not attempted';
 
-    if ($use_azapi && $summit_ref && !$force_radius) {
-        $sota_magic_az_cache_key = 'sota_magic_az_' . sanitize_key($summit_ref);
-        // Read directly from DB to bypass object cache — activation zone polygon stored in wp_options with custom 365-day TTL
-        global $wpdb;
-        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-        $sota_magic_az_raw = $wpdb->get_var($wpdb->prepare(
-            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
-            $sota_magic_az_cache_key
-        ));
-        // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-        $sota_magic_az_cached = false;
-        if ($sota_magic_az_raw !== null) {
-            $sota_magic_az_entry = maybe_unserialize($sota_magic_az_raw);
-            if (is_array($sota_magic_az_entry) && isset($sota_magic_az_entry['expires']) && time() < $sota_magic_az_entry['expires']) {
-                $sota_magic_az_cached = $sota_magic_az_entry['data'];
-            }
-        }
-        if ($sota_magic_az_cached !== false) {
-            $activation_zone_polygon = $sota_magic_az_cached;
-            $api_debug_message       = 'Loaded from cache (terrain polygon — cached 365 days)';
-            if ($activation_zone_polygon) $using_api = true;
-        } else {
-            $api_result = sota_magic_get_activation_zone_from_api($summit_ref, $summit_lat, $summit_lon, $max_elevation);
-            if (is_array($api_result)) {
-                $activation_zone_polygon = $api_result['polygon'];
-                $api_debug_message       = $api_result['debug'];
-                if ($activation_zone_polygon) {
-                    $using_api = true;
-                    // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-                    $wpdb->replace($wpdb->options, [
-                        'option_name'  => $sota_magic_az_cache_key,
-                        'option_value' => maybe_serialize(['data' => $activation_zone_polygon, 'expires' => time() + 365 * DAY_IN_SECONDS]),
-                        'autoload'     => 'no',
-                    ]);
-                    // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-                    $api_debug_message .= ' | Cached for 365 days';
-                }
-            }
+    $zone_source = 'radius';
+    $zone_forced = in_array($zone_mode, ['sotlas', 'activation_zone'], true);
+    if ($summit_ref && !$force_radius && 'radius' !== $zone_mode && ($use_azapi || $zone_forced)) {
+        $zone = sota_magic_resolve_activation_zone($summit_ref, $summit_lat, $summit_lon, $max_elevation, $zone_mode);
+        $api_debug_message = $zone['debug'];
+        if (!empty($zone['polygon'])) {
+            $activation_zone_polygon = $zone['polygon'];
+            $using_api   = true;
+            $zone_source = $zone['source'];
         }
     }
-    
+
     // Second pass: analyze segments and classify time
     $total_time = 0;
     $hiking_time = 0;
@@ -1081,6 +854,7 @@ function sota_magic_analyze_gpx_track($gpx_url, $csv_url = null, $force_radius =
         'summit_lat' => $summit_lat,
         'summit_lon' => $summit_lon,
         'using_api' => $using_api,
+        'zone_source' => $zone_source,
         'activation_zone_polygon' => $activation_zone_polygon,
         'activation_zone_radius' => $activation_zone_radius,
         'summit_ref' => $summit_ref,
@@ -1250,9 +1024,10 @@ function sota_magic_adif_field( $record, $field ) {
  *
  * @param string $log_url             WordPress media URL pointing to .adi/.adif file.
  * @param string $summit_ref_override Summit ref to use when MY_SOTA_REF is absent.
+ * @param string $park_ref_override   Park ref(s) to use when no POTA park is in the record.
  * @return array
  */
-function sota_magic_parse_adif_contacts( $log_url, $summit_ref_override = '' ) {
+function sota_magic_parse_adif_contacts( $log_url, $summit_ref_override = '', $park_ref_override = '' ) {
     $response = wp_remote_get( $log_url, [ 'timeout' => 15 ] );
     if ( is_wp_error( $response ) ) return [];
     $body = wp_remote_retrieve_body( $response );
@@ -1302,6 +1077,17 @@ function sota_magic_parse_adif_contacts( $log_url, $summit_ref_override = '' ) {
         if ( '' === $comments ) $comments = sota_magic_adif_field( $record, 'notes' );
         $gridsquare  = sota_magic_adif_field( $record, 'gridsquare' );
 
+        // POTA: MY_SIG/MY_SIG_INFO describe the activator's park(s); SIG/SIG_INFO the other station's.
+        $my_sig   = strtoupper( sota_magic_adif_field( $record, 'my_sig' ) );
+        $their_sig = strtoupper( sota_magic_adif_field( $record, 'sig' ) );
+        $my_park  = sota_magic_adif_field( $record, 'my_pota_ref' );
+        if ( '' === $my_park && ( 'POTA' === $my_sig || '' === $my_sig ) ) $my_park = sota_magic_adif_field( $record, 'my_sig_info' );
+        $their_park = sota_magic_adif_field( $record, 'pota_ref' );
+        if ( '' === $their_park && ( 'POTA' === $their_sig || '' === $their_sig ) ) $their_park = sota_magic_adif_field( $record, 'sig_info' );
+        $my_park    = implode( ',', sota_magic_park_refs( $my_park ) );
+        $their_park = implode( ',', sota_magic_park_refs( $their_park ) );
+        if ( '' === $my_park ) $my_park = implode( ',', sota_magic_park_refs( $park_ref_override ) );
+
         $contacts[] = [
             'my_summit'    => $my_sota_ref,
             'date'         => $date,
@@ -1312,6 +1098,8 @@ function sota_magic_parse_adif_contacts( $log_url, $summit_ref_override = '' ) {
             'their_summit' => $sota_ref,
             'comments'     => $comments,
             'gridsquare'   => $gridsquare,
+            'my_park'      => $my_park,
+            'their_park'   => $their_park,
         ];
     }
 
@@ -1336,8 +1124,8 @@ add_action('wp_ajax_sota_magic_clear_location_cache', function() {
     global $wpdb;
     // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
     $table = esc_sql( $wpdb->prefix . 'sota_magic_locations' );
-    $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table WHERE source != 'sota'" );
-    $wpdb->query( "DELETE FROM $table WHERE source != 'sota'" );
+    $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table WHERE source NOT IN ('sota','pota')" );
+    $wpdb->query( "DELETE FROM $table WHERE source NOT IN ('sota','pota')" );
     // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
     wp_send_json_success($count . ' cached location(s) cleared. Fresh lookups will run on next map load.');
 });
@@ -1446,6 +1234,9 @@ function sota_magic_contact_map_data_ajax() {
     $csv_url    = isset( $_GET['csv'] )        ? esc_url_raw( wp_unslash( $_GET['csv'] ) )               : '';
     $log_format = isset( $_GET['format'] )     ? sanitize_key( wp_unslash( $_GET['format'] ) )            : 'csv';
     $summit_ref = isset( $_GET['summit_ref'] ) ? sanitize_text_field( wp_unslash( $_GET['summit_ref'] ) ) : '';
+    $park_ref   = isset( $_GET['park_ref'] )   ? sanitize_text_field( wp_unslash( $_GET['park_ref'] ) )   : '';
+    $program    = ( isset( $_GET['program'] ) && 'pota' === $_GET['program'] ) ? 'pota' : 'sota';
+    if ( 'pota' === $program ) $log_format = 'adif'; // POTA logs are ADIF only
 
     if ( ! $csv_url ) {
         wp_send_json( [ 'error' => 'No log file specified' ] );
@@ -1459,7 +1250,7 @@ function sota_magic_contact_map_data_ajax() {
     // Parse log file
     $contacts = [];
     if ( $log_format === 'adif' ) {
-        $contacts = sota_magic_parse_adif_contacts( $csv_url, $summit_ref );
+        $contacts = sota_magic_parse_adif_contacts( $csv_url, $summit_ref, $park_ref );
     } else {
         $csv_response = wp_remote_get( $csv_url, [ 'timeout' => 15 ] );
         if ( ! is_wp_error( $csv_response ) ) {
@@ -1482,9 +1273,26 @@ function sota_magic_contact_map_data_ajax() {
         }
     }
 
+    // POTA: the activator's park(s) come from the POTA API (cached 90 days). First park is the origin.
+    $summit         = null;
+    $extra_origins  = [];
+    if ( 'pota' === $program ) {
+        $my_parks = sota_magic_park_refs( $park_ref );
+        foreach ( $contacts as $c ) {
+            foreach ( sota_magic_park_refs( $c['my_park'] ?? '' ) as $ref ) {
+                if ( ! in_array( $ref, $my_parks, true ) ) $my_parks[] = $ref;
+            }
+        }
+        foreach ( $my_parks as $ref ) {
+            $info = sota_magic_get_park_info( $ref );
+            if ( ! $info ) continue;
+            $origin = [ 'lat' => $info['lat'], 'lon' => $info['lon'], 'name' => $info['name'], 'ref' => $ref, 'kind' => 'park' ];
+            if ( ! $summit ) $summit = $origin; else $extra_origins[] = $origin;
+        }
+    }
+
     // Get summit location from SOTA API (cached 90 days)
-    $summit = null;
-    if ( ! empty( $contacts[0]['my_summit'] ) ) {
+    if ( 'sota' === $program && ! empty( $contacts[0]['my_summit'] ) ) {
         $summit_ref_val = $contacts[0]['my_summit'];
         $summit_key     = 'summit_' . sanitize_key( $summit_ref_val );
         $summit_row     = sota_magic_location_read( $summit_key );
@@ -1528,8 +1336,19 @@ function sota_magic_contact_map_data_ajax() {
 
     foreach ( $contacts as $contact ) {
         $callsign   = $contact['callsign'];
-        $is_s2s     = ! empty( $contact['their_summit'] );
+        $is_s2s     = 'sota' === $program && ! empty( $contact['their_summit'] );
         $band_color = sota_magic_get_band_color( $contact['frequency'] );
+
+        // Priority 1 (POTA): P2P, use the other station's park coordinates
+        if ( 'pota' === $program ) {
+            $their_parks = sota_magic_park_refs( $contact['their_park'] ?? '' );
+            $their_info  = $their_parks ? sota_magic_get_park_info( $their_parks[0] ) : null;
+            if ( $their_info ) {
+                $contact_locations[] = [ 'callsign' => $callsign, 'lat' => $their_info['lat'], 'lon' => $their_info['lon'], 'summit' => '', 'park' => $their_info['ref'], 'mode' => $contact['mode'], 'frequency' => $contact['frequency'], 'is_s2s' => false, 'is_p2p' => true, 'color' => $band_color, 'location_source' => 'pota', 'cached' => ! empty( $their_info['cached'] ) ];
+                continue;
+            }
+            // Park lookup failed: fall through to grid / callsign lookups below
+        }
 
         // Priority 1: S2S — SOTA API summit coordinates
         if ( $is_s2s ) {
@@ -1645,6 +1464,8 @@ function sota_magic_contact_map_data_ajax() {
             'mode'            => $loc['mode'],
             'color'           => $loc['color'],
             'is_s2s'          => (bool) $loc['is_s2s'],
+            'is_p2p'          => ! empty( $loc['is_p2p'] ),
+            'p2p_park'        => $loc['park'] ?? null,
             'location_source' => $loc['location_source'],
             'grid'            => $loc['grid'] ?? null,
             'dist_miles'      => $dist_miles,
@@ -1664,12 +1485,13 @@ function sota_magic_contact_map_data_ajax() {
         $total_rows = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $loc_table" );
         // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
         $debug_meta = [
+            'program'              => $program,
             'summit_found'         => (bool) $summit,
             'summit_ref'           => $summit ? $summit['ref']  : '',
             'summit_lat'           => $summit ? $summit['lat']  : null,
             'summit_lon'           => $summit ? $summit['lon']  : null,
             'raw_contacts_count'   => count( $contacts ),
-            'first_my_summit'      => $contacts[0]['my_summit'] ?? '(empty)',
+            'first_my_summit'      => 'pota' === $program ? ( $contacts[0]['my_park'] ?? '(empty)' ) : ( $contacts[0]['my_summit'] ?? '(empty)' ),
             'resolved_count'       => count( $contact_locations ),
             'lines_drawn'          => $summit ? count( $contact_locations ) : 0,
             'cached_count'         => $cached_count,
@@ -1684,7 +1506,9 @@ function sota_magic_contact_map_data_ajax() {
     }
 
     wp_send_json( [
-        'summit'     => $summit ? [ 'lat' => floatval( $summit['lat'] ), 'lon' => floatval( $summit['lon'] ), 'name' => $summit['name'], 'ref' => $summit['ref'] ] : null,
+        'program'    => $program,
+        'summit'     => $summit ? [ 'lat' => floatval( $summit['lat'] ), 'lon' => floatval( $summit['lon'] ), 'name' => $summit['name'], 'ref' => $summit['ref'], 'kind' => $summit['kind'] ?? 'summit' ] : null,
+        'extra_origins' => $extra_origins,
         'contacts'   => $map_contacts,
         'unresolved' => $unresolved,
         'debug'      => $debug_mode,
@@ -1702,6 +1526,8 @@ add_action('wp_enqueue_scripts', function() {
     $font           = get_option('sota_use_theme_font') ? 'inherit' : 'sans-serif';
     $s2s_bg         = get_option('sota_s2s_highlight', '#ffebee');
     $s2s_text       = get_option('sota_s2s_text_color', '#d32f2f');
+    $p2p_bg         = get_option('pota_p2p_highlight', '#e8f5e9');
+    $p2p_text       = get_option('pota_p2p_text_color', '#2e7d32');
     $is_transparent = (bool) get_option('sota_is_transparent');
     $box_shadow     = $is_transparent ? '' : 'box-shadow:0 5px 20px rgba(0,0,0,0.1);';
     $stat_bg        = $is_transparent ? 'rgba(255,255,255,0.05)' : esc_attr($bg) . '22';
@@ -1721,6 +1547,8 @@ add_action('wp_enqueue_scripts', function() {
         .sota-table td{border-bottom-color:" . esc_attr($text) . "22;}
         .s2s-row td{background:" . esc_attr($s2s_bg) . "!important;color:" . esc_attr($s2s_text) . "!important;}
         .s2s-badge{background:" . esc_attr($s2s_text) . ";}
+        .p2p-row td{background:" . esc_attr($p2p_bg) . "!important;color:" . esc_attr($p2p_text) . "!important;}
+        .p2p-badge{background:" . esc_attr($p2p_text) . ";}
     ";
 
     wp_add_inline_style( 'activator-toolkit', $dynamic_css );
@@ -1731,16 +1559,18 @@ add_action('enqueue_block_editor_assets', function() {
     wp_localize_script('sota-editor-js', 'sotaMagicAdmin', [
         'ajaxUrl' => admin_url('admin-ajax.php'),
         'nonce'   => wp_create_nonce('sota_magic_clear_location_cache'),
+        'defaultProgram' => get_option('sota_default_program', 'sota'),
     ]);
     wp_add_inline_script('sota-editor-js', "
         wp.blocks.registerBlockType('ki6cr/sota-data', {
-            title: 'SOTA Activator Toolkit',
+            title: 'Activator Toolkit (SOTA / POTA)',
             icon: 'location-alt',
             category: 'text',
             attributes: {
                 gpxUrl: {type:'string'},
                 csvUrl: {type:'string'},
                 forceRadiusZone: {type:'boolean', default:false},
+                zoneSource: {type:'string', default:''},
                 overrideHikingDistanceEnabled: {type:'boolean', default:false},
                 overrideHikingDistance: {type:'string', default:''},
                 overrideHikingTimeEnabled: {type:'boolean', default:false},
@@ -1753,7 +1583,9 @@ add_action('enqueue_block_editor_assets', function() {
                 overrideTotalTime: {type:'string', default:''},
                 hideGpxStats: {type:'boolean', default:false},
                 logFormat: {type:'string', default:'csv'},
-                mySummitRef: {type:'string', default:''}
+                mySummitRef: {type:'string', default:''},
+                activationProgram: {type:'string', default:''},
+                myParkRef: {type:'string', default:''}
             },
             edit: function(props) {
                 var _ms = wp.element.useState(false);
@@ -1765,11 +1597,40 @@ add_action('enqueue_block_editor_assets', function() {
                 var _sri = wp.element.useState('');
                 var summitRefInput = _sri[0];
                 var setSummitRefInput = _sri[1];
+                var _prf = wp.element.useState(false);
+                var showParkRefModal = _prf[0];
+                var setShowParkRefModal = _prf[1];
+                var _pri = wp.element.useState('');
+                var parkRefInput = _pri[0];
+                var setParkRefInput = _pri[1];
+                var attrs = props.attributes;
+                var siteDefault = (sotaMagicAdmin.defaultProgram === 'pota') ? 'pota' : 'sota';
+                var legacySota = !!(attrs.gpxUrl || attrs.mySummitRef || (attrs.csvUrl && attrs.logFormat === 'csv'));
+                var program = attrs.activationProgram || 'sota';
+                var isPota = (program === 'pota');
+                function setProgram(p) { props.setAttributes({activationProgram: p}); }
+                wp.element.useEffect(function() {
+                    // Brand-new, empty blocks record their starting mode; saved blocks are left alone
+                    if (!attrs.activationProgram && !legacySota && !attrs.csvUrl && !attrs.myParkRef) {
+                        props.setAttributes({activationProgram: siteDefault});
+                    }
+                }, []);
                 var InspectorControls = (wp.blockEditor || wp.editor).InspectorControls;
+                var programToggle = wp.element.createElement(wp.components.ButtonGroup, null,
+                    wp.element.createElement(wp.components.Button, {variant: isPota ? 'secondary' : 'primary', onClick: function() { setProgram('sota'); }}, 'SOTA (Summits)'),
+                    wp.element.createElement(wp.components.Button, {variant: isPota ? 'primary' : 'secondary', onClick: function() { setProgram('pota'); }}, 'POTA (Parks)')
+                );
                 return wp.element.createElement(wp.element.Fragment, null,
                     wp.element.createElement(InspectorControls, null,
                         wp.element.createElement(wp.components.PanelBody, {title:'Activation Details', initialOpen:true},
-                            wp.element.createElement(wp.components.TextControl, {
+                            wp.element.createElement('p', {style:{margin:'0 0 8px 0', fontWeight:'600'}}, 'Activation Program'),
+                            wp.element.createElement('div', {style:{marginBottom:'16px'}}, programToggle),
+                            isPota ? wp.element.createElement(wp.components.TextControl, {
+                                label:'Park Reference',
+                                help:'Auto-detected from your log file. Edit if needed (e.g. US-3315). For several parks, separate them with commas.',
+                                value:props.attributes.myParkRef || '',
+                                onChange:function(val){props.setAttributes({myParkRef:val});}
+                            }) : wp.element.createElement(wp.components.TextControl, {
                                 label:'Summit Reference',
                                 help:'Auto-detected from your log file. Edit if needed (e.g. W6/SC-219).',
                                 value:props.attributes.mySummitRef || '',
@@ -1780,11 +1641,12 @@ add_action('enqueue_block_editor_assets', function() {
                     wp.element.createElement('div', {
                         style:{padding:'25px', background:'\\x23f5f5f5', border:'2px dashed \\x230073aa', borderRadius:'8px', textAlign:'center'}
                     },
-                    wp.element.createElement('h3', {style:{margin:'0 0 10px 0', color:'\\x230073aa'}}, 'SOTA Activator Toolkit'),
+                    wp.element.createElement('h3', {style:{margin:'0 0 10px 0', color:'\\x230073aa'}}, 'Activator Toolkit'),
+                    wp.element.createElement('div', {style:{marginBottom:'12px'}}, programToggle),
                     wp.element.createElement('p', {style:{color:'\\x23d32f2f', fontWeight:'bold', margin:'0 0 10px 0'}}, 'Map and table visible in Preview only'),
-                    wp.element.createElement('p', {style:{color:'\\x23666', fontSize:'13px', marginBottom:'16px'}}, 'Settings → Activator Toolkit for SOTA to customize colors, units, and more.'),
+                    wp.element.createElement('p', {style:{color:'\\x23666', fontSize:'13px', marginBottom:'16px'}}, 'Settings → Activator Toolkit to customize colors, units, and more.'),
                     wp.element.createElement('div', {style:{textAlign:'left', marginBottom:'16px'}},
-                        wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px'}},
+                        !isPota && wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px'}},
                             wp.element.createElement('div', {style:{flex:'1', minWidth:'0'}},
                                 wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, '📍 GPS Track (.gpx)'),
                                 wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, 'The track file exported from your GPS device or app — Garmin, Gaia GPS, CalTopo, etc.')
@@ -1810,18 +1672,32 @@ add_action('enqueue_block_editor_assets', function() {
                         ),
                         wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', display:'flex', alignItems:'center', gap:'12px'}},
                             wp.element.createElement('div', {style:{flex:'1', minWidth:'0'}},
-                                wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, '📋 Contacts Log (.csv or .adif)'),
-                                wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, 'Upload your SOTA formatted CSV or ADIF log file — the format is detected automatically.')
+                                wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, isPota ? '📋 POTA Log (.adi or .adif)' : '📋 Contacts Log (.csv or .adif)'),
+                                wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, isPota ? 'Upload the ADIF log from your POTA activation, the same file you submit to pota.app. Your park reference is detected automatically.' : 'Upload your SOTA formatted CSV or ADIF log file — the format is detected automatically.')
                             ),
                             wp.element.createElement(wp.blockEditor.MediaUpload, {
                                 onSelect: function(media) {
                                     var url = media.url;
                                     var ext = url.split('?')[0].split('.').pop().toLowerCase();
                                     var isAdif = (ext === 'adif' || ext === 'adi');
-                                    var fmt = isAdif ? 'adif' : 'csv';
-                                    props.setAttributes({csvUrl: url, logFormat: fmt, mySummitRef: ''});
+                                    var fmt = (isAdif || isPota) ? 'adif' : 'csv';
+                                    if (isPota) {
+                                        props.setAttributes({csvUrl: url, logFormat: 'adif', myParkRef: ''});
+                                    } else {
+                                        props.setAttributes({csvUrl: url, logFormat: fmt, mySummitRef: ''});
+                                    }
                                     fetch(url).then(function(r){ return r.text(); }).then(function(content){
                                         var ref = '';
+                                        if (isPota) {
+                                            var re = /<(my_sig_info|my_pota_ref):(\\d+)[^>]*>/ig, mm, seen = {}, list = [];
+                                            while ((mm = re.exec(content)) !== null) {
+                                                var v = content.substr(mm.index + mm[0].length, parseInt(mm[2], 10)).trim().toUpperCase();
+                                                v.split(/[\\s,;]+/).forEach(function(x){ if (/^[A-Z0-9]{1,4}-\\d{3,6}\x24/.test(x) && !seen[x]) { seen[x] = 1; list.push(x); } });
+                                            }
+                                            ref = list.join(',');
+                                            if (ref) { props.setAttributes({myParkRef: ref}); } else { setParkRefInput(''); setShowParkRefModal(true); }
+                                            return;
+                                        }
                                         if (isAdif) {
                                             var m = content.match(/<my_sota_ref:\\d+[^>]*>([^\\r\\n<]+)/i);
                                             ref = m ? m[1].trim() : '';
@@ -1848,12 +1724,12 @@ add_action('enqueue_block_editor_assets', function() {
                                 icon: 'trash',
                                 label: 'Remove log file',
                                 isSmall: true,
-                                onClick: function() { props.setAttributes({csvUrl: '', logFormat: 'csv'}); },
+                                onClick: function() { props.setAttributes({csvUrl: '', logFormat: isPota ? 'adif' : 'csv'}); },
                                 style:{flexShrink:'0', color:'\\x23999999'}
                             })
                         )
                     ),
-                    wp.element.createElement('div', {style:{textAlign:'center', marginBottom:'10px'}},
+                    !isPota && wp.element.createElement('div', {style:{textAlign:'center', marginBottom:'10px'}},
                         wp.element.createElement('button', {
                             onClick: function(e) { e.preventDefault(); setShowModal(true); },
                             style:{background:'none', border:'1px solid \\x230073aa', borderRadius:'20px', color:'\\x230073aa', fontSize:'12px', cursor:'pointer', padding:'3px 14px', lineHeight:'1.6'}
@@ -1885,16 +1761,43 @@ add_action('enqueue_block_editor_assets', function() {
 
                             wp.element.createElement('h3', {style:{margin:'0 0 8px 0', color:'\\x230073aa', fontSize:'14px'}}, 'Why Stats Might Look Wrong'),
                             wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
-                                wp.element.createElement('strong', null, 'Activation time is 0 or missing'), ' — The plugin could not locate the activation zone. Check that your CSV file includes a valid summit reference. Turn on Debug Mode in Settings → Activator Toolkit for SOTA for details.'
+                                wp.element.createElement('strong', null, 'Activation time is 0 or missing'), ' — The plugin could not locate the activation zone. Check that your CSV file includes a valid summit reference. Turn on Debug Mode in Settings → Activator Toolkit for details.'
                             ),
                             wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
                                 wp.element.createElement('strong', null, 'Zone looks wrong on the map'), ' — Look for a red polygon (API-based) or orange circle (radius fallback) on the map. If you see a circle, the API did not return a zone. Try increasing the radius in Settings, or use the Statistics Override below to force a specific value.'
                             ),
                             wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
-                                wp.element.createElement('strong', null, 'Hiking time seems too high'), ' — Rest breaks are included in hiking time. Adjust the rest break threshold in Settings → Activator Toolkit for SOTA.'
+                                wp.element.createElement('strong', null, 'Hiking time seems too high'), ' — Rest breaks are included in hiking time. Adjust the rest break threshold in Settings → Activator Toolkit.'
                             ),
                             wp.element.createElement('p', {style:{margin:'0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
                                 wp.element.createElement('strong', null, 'GPS track does not reach the summit'), ' — The zone is centred on the official SOTA summit coordinates (or the highest GPS point if the SOTA API was unavailable). If you stopped before the peak, use the Activation Zone radius override below or manually enter the activation time.'
+                            )
+                        )
+                    ),
+                    showParkRefModal && wp.element.createElement(wp.components.Modal, {
+                        title: 'Park Reference Required',
+                        onRequestClose: function() { setShowParkRefModal(false); }
+                    },
+                        wp.element.createElement('div', {style:{fontSize:'13px', lineHeight:'1.65', color:'\\x23333333', maxWidth:'420px'}},
+                            wp.element.createElement('p', {style:{marginTop:'0', marginBottom:'12px'}},
+                                'Your log file does not include a park reference (MY_SIG_INFO). Enter it below so the park can be shown on the map. For several parks, separate them with commas.'
+                            ),
+                            wp.element.createElement('input', {
+                                type: 'text',
+                                placeholder: 'e.g. US-3315',
+                                value: parkRefInput,
+                                onChange: function(e) { setParkRefInput(e.target.value); },
+                                style:{width:'100%', padding:'6px 8px', fontSize:'14px', borderRadius:'4px', border:'1px solid \\x23cccccc', marginBottom:'14px', boxSizing:'border-box'}
+                            }),
+                            wp.element.createElement('div', {style:{display:'flex', gap:'8px', justifyContent:'flex-end'}},
+                                wp.element.createElement(wp.components.Button, {variant: 'secondary', onClick: function() { setShowParkRefModal(false); }}, 'Skip for now'),
+                                wp.element.createElement(wp.components.Button, {
+                                    variant: 'primary',
+                                    onClick: function() {
+                                        if (parkRefInput.trim()) { props.setAttributes({myParkRef: parkRefInput.trim()}); }
+                                        setShowParkRefModal(false);
+                                    }
+                                }, 'Save')
                             )
                         )
                     ),
@@ -1928,7 +1831,7 @@ add_action('enqueue_block_editor_assets', function() {
                             )
                         )
                     ),
-                    wp.element.createElement('div', {style:{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', padding:'8px 10px',
+                    !isPota && wp.element.createElement('div', {style:{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', padding:'8px 10px',
                         background: props.attributes.hideGpxStats ? '\\x23fff3cd' : '\\x23f0f0f0', borderRadius:'4px',
                         border: props.attributes.hideGpxStats ? '1px solid \\x23f0ad4e' : '1px solid \\x23dddddd'}},
                         wp.element.createElement('input', {type:'checkbox', id:'hideGpxStats', checked:!!props.attributes.hideGpxStats,
@@ -1938,29 +1841,23 @@ add_action('enqueue_block_editor_assets', function() {
                             color: props.attributes.hideGpxStats ? '\\x23856404' : '\\x23333333', fontFamily:'sans-serif', lineHeight:'1.4'}},
                             props.attributes.hideGpxStats ? '(hidden) GPX hike statistics' : 'Hide GPX hike statistics from post')
                     ),
-                    wp.element.createElement(wp.components.PanelBody, {title:'Statistics Overrides', initialOpen:false},
+                    !isPota && wp.element.createElement(wp.components.PanelBody, {title:'Statistics Overrides', initialOpen:false},
                         wp.element.createElement('p', {style:{fontSize:'12px', color:'\\x23555555', marginTop:'0', marginBottom:'12px', lineHeight:'1.5'}},
                             'Check the box next to a field to enable that override. Leave unchecked to use the GPX-calculated value.'
                         ),
-                        // --- Activation Zone (no text input, just a toggle) ---
-                        wp.element.createElement('div', {style:{display:'table', width:'100%', borderCollapse:'collapse', marginBottom:'6px'}},
-                            wp.element.createElement('div', {style:{display:'table-row'}},
-                                wp.element.createElement('div', {style:{display:'table-cell', verticalAlign:'middle', width:'24px', paddingRight:'8px'}},
-                                    wp.element.createElement('input', {type:'checkbox', checked:!!props.attributes.forceRadiusZone,
-                                        onChange:function(e){props.setAttributes({forceRadiusZone:e.target.checked});},
-                                        style:{width:'16px',height:'16px',cursor:'pointer',display:'block'}})
-                                ),
-                                wp.element.createElement('div', {style:{display:'table-cell', verticalAlign:'middle', width:'175px', paddingRight:'8px',
-                                    fontWeight:'700', fontSize:'13px', color:'\\x23000000', fontFamily:'sans-serif'}},
-                                    'Activation Zone:'
-                                ),
-                                wp.element.createElement('div', {style:{display:'table-cell', verticalAlign:'middle',
-                                    fontSize:'12px', color: props.attributes.forceRadiusZone ? '\\x23c05000' : '\\x23555555',
-                                    fontStyle: props.attributes.forceRadiusZone ? 'normal' : 'italic', fontFamily:'sans-serif'}},
-                                    props.attributes.forceRadiusZone ? 'Radius-based (API skipped)' : 'Using API / plugin default'
-                                )
-                            )
-                        ),
+                        // --- Activation Zone source ---
+                        wp.element.createElement(wp.components.SelectControl, {
+                            label: 'Activation Zone Source',
+                            help: 'Auto tries SOTLAS (high detail) first, then Activation.Zone, then a simple radius circle. Pick a specific source to force it; if that source has no zone for this summit, the radius circle is used.',
+                            value: props.attributes.zoneSource || (props.attributes.forceRadiusZone ? 'radius' : 'auto'),
+                            options: [
+                                {label: 'Auto (SOTLAS, then Activation.Zone)', value: 'auto'},
+                                {label: 'SOTLAS only', value: 'sotlas'},
+                                {label: 'Activation.Zone only', value: 'activation_zone'},
+                                {label: 'Radius circle only (skip APIs)', value: 'radius'}
+                            ],
+                            onChange: function(val) { props.setAttributes({zoneSource: val, forceRadiusZone: val === 'radius'}); }
+                        }),
                         wp.element.createElement('hr', {style:{border:'none', borderTop:'1px solid \\x23dddddd', margin:'8px 0'}}),
                         // --- Hike Distance ---
                         wp.element.createElement('div', {style:{display:'table', width:'100%', borderCollapse:'collapse', marginBottom:'6px'}},
@@ -2083,7 +1980,7 @@ add_action('enqueue_block_editor_assets', function() {
                             )
                         ),
                         wp.element.createElement('p', {style:{fontSize:'11px', color:'\\x23888888', fontFamily:'sans-serif', margin:'16px 0 0', paddingTop:'12px', borderTop:'1px solid \\x23e0e0e0'}},
-                            'To clear cached contact locations, go to Settings → Activator Toolkit for SOTA → Callsign Lookup.'
+                            'To clear cached contact locations, go to Settings → Activator Toolkit → Callsign Lookup.'
                         )
                     )
                     )
@@ -2210,7 +2107,16 @@ function sota_parse_time_override($hhmm) {
     return null;
 }
 
+/**
+ * Work out which program a block is in. The plugin was SOTA-only before the toggle existed,
+ * so any block without an explicit activationProgram is SOTA, no matter what the site default is.
+ */
+function sota_magic_block_program($atts) {
+    return (($atts['activationProgram'] ?? '') === 'pota') ? 'pota' : 'sota';
+}
+
 function sota_magic_render_sota_data($atts) {
+    if (sota_magic_block_program($atts) === 'pota') return sota_magic_render_pota_data($atts);
     $gpx_url       = $atts['gpxUrl'] ?? '';
     $csv_url       = $atts['csvUrl'] ?? '';
     $log_format    = $atts['logFormat'] ?? 'csv';
@@ -2218,7 +2124,11 @@ function sota_magic_render_sota_data($atts) {
     if (!$gpx_url && !$csv_url) return '';
 
     // Manual override attributes (only applied when their Enabled flag is checked)
-    $force_radius_zone      = !empty($atts['forceRadiusZone']);
+    $zone_mode = $atts['zoneSource'] ?? '';
+    if (!in_array($zone_mode, ['auto', 'sotlas', 'activation_zone', 'radius'], true)) {
+        $zone_mode = !empty($atts['forceRadiusZone']) ? 'radius' : 'auto'; // blocks saved before the zone source override
+    }
+    $force_radius_zone      = ('radius' === $zone_mode);
     $override_hiking_dist   = !empty($atts['overrideHikingDistanceEnabled']) ? trim($atts['overrideHikingDistance'] ?? '') : '';
     $override_hiking_time   = !empty($atts['overrideHikingTimeEnabled'])     ? trim($atts['overrideHikingTime'] ?? '')    : '';
     $override_act_time      = !empty($atts['overrideActivationTimeEnabled']) ? trim($atts['overrideActivationTime'] ?? '') : '';
@@ -2242,7 +2152,7 @@ function sota_magic_render_sota_data($atts) {
     $gpx_stats = null;
     $track_points = [];
     if ($gpx_url && $show_gpx_stats) {
-        $gpx_stats = sota_magic_analyze_gpx_track($gpx_url, $csv_url, $force_radius_zone, $my_summit_ref ?: null);
+        $gpx_stats = sota_magic_analyze_gpx_track($gpx_url, $csv_url, $force_radius_zone, $my_summit_ref ?: null, $zone_mode);
         if ($gpx_stats && !empty($gpx_stats['track_points'])) {
             $track_points = $gpx_stats['track_points'];
         }
@@ -2398,7 +2308,7 @@ function sota_magic_render_sota_data($atts) {
                         <div class="sota-stat-label">Activation Time</div>
                         <div class="sota-stat-secondary">
                             <?php if ($gpx_stats['using_api']): ?>
-                                <span title="Using precise activation zone from activation.zone API">✓ API-based zone</span>
+                                <span title="<?php echo esc_attr($gpx_stats['zone_source'] === 'sotlas' ? 'Using the high-precision SOTLAS activation zone' : 'Using the activation.zone terrain-based activation zone'); ?>">✓ <?php echo esc_html($gpx_stats['zone_source'] === 'sotlas' ? 'SOTLAS zone' : 'Terrain-based zone'); ?></span>
                             <?php else: ?>
                                 <span title="Using radius approximation method">Within <?php echo esc_html((string) $gpx_stats['activation_zone_radius']); ?>m of summit</span>
                             <?php endif; ?>
@@ -2438,11 +2348,16 @@ function sota_magic_render_sota_data($atts) {
                 <div style="margin-top:15px; padding:12px; background:rgba(0,0,0,0.03); border-radius:8px; font-size:13px; color:#666;">
                     <strong>Activation Zone Method:</strong>
                     <?php if ($gpx_stats['using_api']): ?>
-                        Using precise terrain-based activation zone from <a href="https://activation.zone" target="_blank" style="color:#0073aa;">activation.zone</a> (by N6ARA).
-                        This uses Digital Elevation Model (DEM) data and the official SOTA 25m vertical drop rule for maximum accuracy.
+                        <?php if ($gpx_stats['zone_source'] === 'sotlas'): ?>
+                        Using the high-precision terrain-based activation zone from <a href="https://sotl.as" target="_blank" style="color:#0073aa;">SOTLAS</a>.
+                        It is calculated from elevation data and the official SOTA 25m vertical drop rule, at roughly 1 meter detail.
+                        <?php else: ?>
+                        Using the terrain-based activation zone from <a href="https://activation.zone" target="_blank" style="color:#0073aa;">activation.zone</a> (by N6ARA).
+                        It uses Digital Elevation Model (DEM) data and the official SOTA 25m vertical drop rule.
+                        <?php endif; ?>
                     <?php else: ?>
                         Using radius approximation method (<?php echo esc_html((string) $gpx_stats['activation_zone_radius']); ?>m from highest GPS point).
-                        For more accuracy, enable the activation.zone API in Settings → Activator Toolkit for SOTA, or ensure your CSV file includes the summit reference.
+                        For more accuracy, turn on terrain-based activation zones in Settings → Activator Toolkit, or make sure your log includes the summit reference.
                     <?php endif; ?>
                 </div>
                 
@@ -2492,15 +2407,21 @@ function sota_magic_render_sota_data($atts) {
                         <div class="sota-modal-section">
                             <h3><?php sota_magic_echo_svg('pin', 17); ?> Activation Zone Methods</h3>
                             <?php if ($gpx_stats['using_api']): ?>
-                            <p><strong>API-based zone (currently active):</strong> The boundary is retrieved from <a href="https://activation.zone" target="_blank" style="color:#0073aa;">activation.zone</a> using Digital Elevation Model (DEM) terrain data and the official SOTA rule — the zone extends to where the terrain drops 25 metres below the summit. This is the most accurate method and matches what SOTA adjudicators use.</p>
+                            <p><strong>Terrain-based zone (currently active):</strong> The boundary extends to where the terrain drops 25 metres below the summit, following the official SOTA rule.
+                            <?php if ($gpx_stats['zone_source'] === 'sotlas'): ?>
+                            It comes from <a href="https://sotl.as" target="_blank" style="color:#0073aa;">SOTLAS</a>, which publishes boundaries at roughly 1 meter detail. This is the most accurate method available.
+                            <?php else: ?>
+                            It comes from <a href="https://activation.zone" target="_blank" style="color:#0073aa;">activation.zone</a>, which uses lower resolution elevation data. SOTLAS is tried first and had no boundary for this summit.
+                            <?php endif; ?>
+                            </p>
                             <?php else: ?>
                             <p><strong>Radius method (currently active):</strong> The activation zone is approximated as a circle of <strong><?php echo esc_html((string) $gpx_stats['activation_zone_radius']); ?> metres</strong> around the highest GPS point. This is less precise than the API method because it ignores terrain shape, but works without an internet lookup or summit reference in the log.</p>
-                            <p>For better accuracy, enable the activation.zone API in <em>Settings → Activator Toolkit for SOTA</em> and ensure your CSV log includes the summit reference.</p>
+                            <p>For better accuracy, turn on terrain-based activation zones in <em>Settings → Activator Toolkit</em> and make sure your log includes the summit reference.</p>
                             <?php endif; ?>
                         </div>
 
                         <div class="sota-modal-note">
-                            <?php sota_magic_echo_svg('gear', 14); ?> The stationary speed threshold, rest break minimum duration, activation zone radius, and unit system (metric/imperial) can all be tuned in <strong>Settings → Activator Toolkit for SOTA</strong>. If any values look wrong, the Manual Overrides on the Activator Toolkit block let you correct individual figures without re-uploading files.
+                            <?php sota_magic_echo_svg('gear', 14); ?> The stationary speed threshold, rest break minimum duration, activation zone radius, and unit system (metric/imperial) can all be tuned in <strong>Settings → Activator Toolkit</strong>. If any values look wrong, the Manual Overrides on the Activator Toolkit block let you correct individual figures without re-uploading files.
                         </div>
                     </div>
                 </div>
@@ -2510,7 +2431,7 @@ function sota_magic_render_sota_data($atts) {
                 <?php if (get_option('sota_debug_mode_public') || (get_option('sota_debug_mode') && current_user_can('manage_options'))): ?>
                 <div style="margin-top:10px; padding:10px; background:#fff3cd; border:1px solid #ffc107; border-radius:5px; font-size:12px; font-family:monospace;">
                     <strong>Debug Info:</strong><br>
-                    API Enabled: <?php echo get_option('sota_use_azapi') ? 'YES' : 'NO'; ?><br>
+                    API Enabled: <?php echo get_option('sota_use_azapi') ? 'YES' : 'NO'; ?> (zone mode: <?php echo esc_html($zone_mode); ?>, source: <?php echo esc_html($gpx_stats['zone_source']); ?>)<br>
                     CSV URL: <?php echo $csv_url ? 'Present' : 'Missing'; ?><br>
                     Summit Reference: <?php echo esc_html(isset($gpx_stats['summit_ref']) ? $gpx_stats['summit_ref'] : 'Not extracted'); ?><br>
                     Using API: <?php echo $gpx_stats['using_api'] ? 'YES' : 'NO'; ?><br>
