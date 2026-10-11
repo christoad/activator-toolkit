@@ -1,162 +1,222 @@
 === Activator Toolkit for SOTA & POTA ===
 Contributors: creddick
-Tags: sota, amateur radio, ham radio, gpx, mapping
+Tags: sota, pota, amateur radio, ham radio, gpx
 Requires at least: 6.0
 Tested up to: 7.1
-Stable tag: 1.1.10
+Stable tag: 1.2.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Display your SOTA activation beautifully — GPX maps, elevation charts, hiking stats, contact tables, and a contact map. No other plugins needed.
+Show off SOTA and POTA activations: GPX hike maps, elevation charts, hiking stats, contact tables, and interactive contact maps.
 
 == Description ==
 
-Activator Toolkit for SOTA is a WordPress plugin for amateur radio operators participating in Summits On The Air (SOTA). Add the Activator Toolkit block to any post or page, upload your GPX track and activation log (SOTA CSV, ADIF, or ADI format), and the plugin automatically generates:
+Activator Toolkit is a WordPress plugin for amateur radio operators who activate summits for **Summits on the Air (SOTA)** or parks for **Parks on the Air (POTA)**. Add the Activator Toolkit block to any post or page, pick SOTA or POTA with the toggle at the top of the block, upload your files, and the plugin builds the rest.
 
-* An interactive GPX track map with three selectable base layers (Topographic, OpenStreetMap, Minimal)
-* An elevation profile chart with hover-to-map interaction
-* A "Zoom to Activation Zone" button showing the precise activation boundary
-* Hiking statistics: time, distance, elevation gain/loss, average speed, and peak elevation
-* A contacts table with automatic Summit-to-Summit (S2S) highlighting
-* An interactive contact map showing where your QSOs were located
+**In SOTA mode**, upload your GPX track and your activation log (SOTA CSV, ADIF, or ADI). You get:
 
-**No other plugins required.** All map libraries (Leaflet 1.9.4, Chart.js 4.5.1) are bundled with the plugin.
+* An interactive map of your hike with three base layers (Topographic, OpenStreetMap, Minimal)
+* An elevation profile chart that tracks your position on the map as you hover
+* The summit's activation zone drawn on the map, with a "Zoom to Activation Zone" button
+* Hiking statistics: hiking time, activation time, total time, elevation gain and peak, hiking speed, and total distance
+* A contacts table with Summit-to-Summit (S2S) contacts highlighted
+* An interactive contact map showing where every station you worked was located
+
+**In POTA mode**, upload the ADIF log you submit to pota.app. You get:
+
+* Your park (or parks) named at the top, looked up automatically from the official POTA park list
+* An interactive contact map with a pin at your park and a line to every station you worked
+* Park-to-Park (P2P) contacts placed at the other station's park and marked with a P2P badge
+* A contacts table with a "Their Park" column and P2P contacts highlighted
+* Support for activating several parks at once from the same spot
+
+Both modes show a "Furthest contact" tile on the contact map, and hovering a row in the contacts table highlights that station on the map.
+
+**Your existing posts are safe.** Every block created before POTA support was added stays in SOTA mode. Only blocks you switch to POTA render as POTA.
+
+**No other plugins required.** All map and chart libraries (Leaflet 1.9.4, Chart.js 4.5.1) are bundled with the plugin.
 
 = Features =
 
-* **Standalone GPX Map** — Interactive Leaflet map with Topographic, OpenStreetMap, and CartoDB Minimal base layers
-* **Elevation Chart** — Profile chart below the map; hover to see a position dot track across the map
-* **Activation Zone Overlay** — Precise terrain-based polygon from the Activation.Zone API (by N6ARA), or a radius circle fallback
-* **Zoom to Activation Zone** — One-click button to zoom the map to the activation zone boundary
-* **Summit Peak Marker** — 🏔️ marker at the highest point in your track
-* **Intelligent Track Analysis** — Automatically calculates hiking time vs. activation time using the Activation.Zone API or a configurable radius fallback
-* **Rest Break Tracking** — Tracked separately and shown as a sub-note under hiking time
-* **Metric or Imperial Units** — Choose km/m/km/h or mi/ft/mph in settings
-* **Multiple Log Formats** — Accepts SOTA CSV v2, ADIF (.adif), and ADI (.adi) log files; format is detected automatically
-* **Contact Log Tables** — Responsive, horizontally-scrollable tables showing all contacts
-* **S2S Highlighting** — Automatic detection and custom color highlighting for Summit-to-Summit contacts
-* **Interactive Contact Map** — Shows contact locations by band, with lines to the summit; contacts with a grid square in Comments are plotted without any external service; S2S contacts use the free SOTA API; all other contacts use QRZ.com XML lookups (requires a QRZ XML subscription)
-* **Maidenhead Grid Support** — Contacts with a grid square in the comments field are plotted automatically
-* **Fully Customizable** — Colors, fonts, headlines, and display options in Settings → Activator Toolkit for SOTA
-* **Block Editor Compatible** — Simple Gutenberg block with file upload and manual override fields
-* **Responsive Design** — Works on mobile and desktop
+* **SOTA / POTA Toggle:** Each block has its own SOTA or POTA mode, so one site can mix summit and park posts. Choose which mode new blocks start in under Settings → Activator Toolkit → General.
+* **GPX Track Map (SOTA):** Interactive Leaflet map with Topographic, OpenStreetMap, and Minimal base layers
+* **Elevation Chart (SOTA):** Profile chart below the map; hover to see a position dot move along the track
+* **Activation Zone Overlay (SOTA):** The most detailed zone available is used automatically: SOTLAS terrain zones first, then Activation.Zone (by N6ARA), then a simple radius circle. You can override the source per post.
+* **Intelligent Track Analysis (SOTA):** Splits your outing into hiking time and activation time, with rest breaks tracked separately
+* **Park Lookup (POTA):** Your park reference is read from the log (MY_SIG_INFO or MY_POTA_REF) and the park's name and location come from the POTA park database
+* **Park-to-Park Detection (POTA):** Contacts who logged their own park are highlighted, placed at that park on the map, and shown with a P2P badge
+* **Multiple Log Formats:** SOTA CSV v2, ADIF (.adif), and ADI (.adi); the format is detected automatically
+* **Interactive Contact Map:** Lines from your summit or park to every contact, colored by band, with a Furthest Contact tile and a list of any stations that could not be located
+* **Smart Station Locations:** Grid squares from your log are used first; otherwise the plugin looks up the callsign with Callook.info (free, US), HamQTH (free account, worldwide), or QRZ.com (XML subscription)
+* **Locations Saved at Activation Time:** Each station's location is stored, so your map keeps showing where they were on the day of the activation even if they move later
+* **Metric or Imperial Units:** km, m, km/h or mi, ft, mph
+* **Fully Customizable:** Colors, S2S and P2P highlight colors, headlines, block width, and fonts in Settings → Activator Toolkit
+* **Block Editor Friendly:** Simple Gutenberg block with file upload, auto-detected summit or park reference, and manual override fields
+* **Responsive Design:** Works on phones and desktops
 
-= How Activation Time is Calculated =
+= How Activation Time is Calculated (SOTA) =
 
-The plugin uses two methods to determine the activation zone, applied in priority order:
+The plugin finds the summit's activation zone, then counts any time your GPS track spends inside it as activation time. It looks for the zone in this order:
 
-**Method 1: Activation.Zone API (Primary)**
-Queries api.activation.zone (by N6ARA) using your summit reference from the CSV file. The API returns a precise polygon based on terrain elevation data and the official SOTA 25m vertical drop rule. All time spent inside this polygon counts as activation time.
+1. **SOTLAS:** Terrain-based zone boundaries at roughly 1 meter detail, when SOTLAS has them for the summit.
+2. **Activation.Zone:** Terrain-based zone from the Activation.Zone API by N6ARA, based on elevation data and the official SOTA 25m vertical drop rule.
+3. **Radius circle:** A configurable circle (default 50m) around the highest point of your track, used when neither service has a zone for the summit.
 
-**Method 2: Radius Fallback (Automatic)**
-If the API is disabled or unavailable, the plugin draws a configurable circle (default 50m) around the highest GPS point. Configurable in Settings → Activator Toolkit for SOTA (20–200m).
+You can force a specific source for any post in the block's Statistics Overrides panel.
+
+= How POTA Mode Works =
+
+POTA mode is driven entirely by your log file. Upload the ADIF log you submit to pota.app and the plugin:
+
+1. Reads your park reference from the log (for example US-8144). For a multi-park activation, list several parks separated by commas.
+2. Looks up each park's name and official location from the POTA park database.
+3. Places a pin at your park and draws a line to each station you worked.
+4. Places Park-to-Park contacts at their park, and everyone else at their grid square or callsign location.
+
+POTA does not publish park boundaries, so there is no activation zone in POTA mode. Each park is shown as a single pin at its official location.
 
 = Supported Log Formats =
 
-**SOTA CSV v2** (the format exported from SOTA Logger apps and submitted to sota.org):
+**SOTA CSV v2** (the format exported from SOTA logging apps and submitted to sota.org):
 `V2, MyCall, MySummit, Date (DD/MM/YY), Time, Frequency, Mode, TheirCall, TheirSummit, Comments`
 
-**ADIF / ADI** — Standard amateur radio log files exported from logging software such as WSJT-X, Log4OM, MacLoggerDX, and most others. Both `.adif` and `.adi` file extensions are accepted. The format is detected automatically — no configuration needed.
+**ADIF / ADI:** Standard amateur radio log files exported from logging software such as HAMRS, Polo, WSJT-X, Log4OM, MacLoggerDX, and most others. Both `.adif` and `.adi` file extensions are accepted, and the format is detected automatically. POTA mode reads the standard POTA fields (MY_SIG / MY_SIG_INFO / MY_POTA_REF for your park, SIG / SIG_INFO / POTA_REF for the other station's park).
 
 = Requirements =
 
 * WordPress 6.0 or later
 * PHP 7.4 or later
-* QRZ.com XML subscription (optional — only needed for contact map location lookups)
+* A QRZ.com XML subscription is optional. Free Callook.info and HamQTH lookups are tried first.
 
 == Installation ==
 
 = Automatic Installation =
 
 1. Log in to your WordPress admin panel
-2. Navigate to Plugins → Add New
-3. Search for "SOTA Magic"
-4. Click "Install Now" then "Activate"
+2. Go to Plugins → Add New
+3. Search for "Activator Toolkit"
+4. Click "Install Now", then "Activate"
 
 = Manual Installation =
 
 1. Download the plugin zip file
-2. Navigate to Plugins → Add New → Upload Plugin
+2. Go to Plugins → Add New → Upload Plugin
 3. Upload the zip and click "Install Now"
 4. Activate the plugin
 
 = After Installation =
 
-1. Go to Settings → Activator Toolkit for SOTA and configure your preferences
+1. Go to Settings → Activator Toolkit. On the General tab, choose whether new blocks start in SOTA or POTA mode.
 2. In any post or page, add the "Activator Toolkit" block
-3. Upload your GPX file and/or activation log (SOTA CSV, ADIF, or ADI format)
-4. Publish or preview — your activation data appears automatically
+3. Use the toggle at the top of the block to pick SOTA (Summits) or POTA (Parks)
+4. For SOTA, upload your GPX track and your log. For POTA, upload your ADIF log.
+5. Preview or publish. Your maps and tables appear automatically.
 
 == Frequently Asked Questions ==
 
+= Does it work for Parks on the Air (POTA)? =
+
+Yes. Switch the block to POTA (Parks) using the toggle at the top of the block, then upload your ADIF log. You get a park header, a contact map with your park pinned, and a contacts table with Park-to-Park contacts highlighted.
+
+= Will updating change my existing SOTA posts? =
+
+No. Every block made before POTA support was added stays in SOTA mode. Changing the default mode in Settings only affects brand new blocks.
+
+= How does the plugin find my park? =
+
+From your log. Most POTA logging apps write your park into the MY_SIG_INFO or MY_POTA_REF field, and the plugin reads it automatically. You can also type or correct the park reference in the block's sidebar.
+
+= Can I activate more than one park at once? =
+
+Yes. Enter the parks separated by commas (for example `US-1254, US-3424`). Each park gets a pin on the map and is listed at the top. Distances are measured from the first park.
+
+= Why is there no activation zone in POTA mode? =
+
+POTA only publishes a single point for each park, not its boundary, so each park is shown as a pin at its official location.
+
+= Can I upload a GPX track in POTA mode? =
+
+Not yet. POTA mode is log only for now. Hike maps and statistics are available in SOTA mode.
+
 = Do I need any other plugins? =
 
-No. As of version 1.0.0, SOTA Magic is fully standalone. All mapping libraries are bundled with the plugin. No WP GPX Maps or any other plugin is required.
+No. All mapping libraries are bundled with the plugin.
 
 = How does the plugin determine hiking vs. activation time? =
 
-**Primary method — Activation.Zone API:**
-Queries api.activation.zone (by N6ARA) for a precise terrain-based zone polygon. Requires a summit reference in your CSV file. All time inside the polygon = activation time.
-
-**Fallback method — Radius approximation:**
-A circle of configurable radius (default 50m) around the highest GPS point. Used automatically if the API is disabled or unavailable.
+It finds the activation zone (SOTLAS first, then Activation.Zone, then a radius circle around the highest point) and counts all time your track spends inside the zone as activation time. See "How Activation Time is Calculated" above.
 
 = What is Activation.Zone? =
 
-Activation.Zone is a free tool by N6ARA that calculates the precise SOTA activation zone for any summit using Digital Elevation Model (DEM) data and the official 25m vertical drop rule. SOTA Magic integrates with their public API. No account required.
+Activation.Zone is a free tool by N6ARA that calculates the SOTA activation zone for a summit from elevation data and the official 25m vertical drop rule. No account required.
 
-= What if the Activation.Zone API is unavailable? =
+= What is SOTLAS? =
 
-The plugin automatically falls back to the radius method. Statistics are still calculated; the activation zone will show as an orange dashed circle instead of a red polygon.
+SOTLAS is a popular SOTA mapping site that publishes high-detail activation zones for many summits. When it has a zone for your summit, the plugin uses it first.
+
+= What if no zone service has my summit? =
+
+The plugin falls back to a radius circle around the highest point of your track. Statistics are still calculated, and the zone shows as an orange dashed circle instead of a red polygon.
 
 = Do I need a QRZ subscription? =
 
-Only for the contact map's fallback location lookup. The contact map resolves locations in priority order: (1) Maidenhead grid squares in the Comments field — no QRZ needed; (2) S2S contacts via the free SOTA API — no QRZ needed; (3) all other contacts via the QRZ.com XML API.
-
-QRZ XML access requires a paid QRZ subscription — either the "XML Logbook Data" plan (~$35.95/year) or the Platinum plan. A free QRZ account does not include XML access. Contacts that cannot be located are shown in a "No location found" panel on the map rather than silently dropped.
+No. Station locations are found in this order: grid squares in your log, then Callook.info (free, US callsigns), then HamQTH (free account, worldwide), then QRZ.com if you have an XML subscription. Stations that still cannot be located are listed in a "No location found" panel on the map rather than silently dropped.
 
 = What log file formats are supported? =
 
-SOTA CSV v2 (the format exported by SOTA Logger and submitted to sota.org), ADIF (.adif), and ADI (.adi). The format is detected automatically — just upload the file. If the file does not include a summit reference, the plugin will prompt you to enter one.
+SOTA CSV v2, ADIF (.adif), and ADI (.adi). The format is detected automatically. If the file does not include your summit or park reference, the block prompts you to enter one.
 
 = Can I use Maidenhead grid squares for contact locations? =
 
-Yes. If a 4- or 6-character grid square appears anywhere in the contact's Comments field, SOTA Magic will use it to plot the contact on the map. This works without QRZ credentials.
+Yes. A grid square in the ADIF GRIDSQUARE field, or a 4 or 6 character grid in the contact's comments, is used to place the contact on the map without any lookup service.
 
 = Can I override the calculated statistics? =
 
-Yes. The Activator Toolkit block editor panel includes manual override fields for hiking distance, hiking time, activation time, rest breaks, and total time. Check the box next to a field to enable the override.
-
-= Can I force the radius method instead of the API? =
-
-Yes. In the block editor, check "Activation Zone: Radius-based (API skipped)" in the Manual Overrides panel. Or disable the API globally in Settings → Activator Toolkit for SOTA.
+Yes. In SOTA mode, the block's sidebar has manual override fields for hiking distance, hiking time, activation time, rest breaks, and total time, plus a choice of activation zone source.
 
 = Can I use multiple blocks on one page? =
 
-Yes. Each Activator Toolkit block is fully independent. Multiple activations can appear on the same post or page.
+Yes. Each Activator Toolkit block is independent, and SOTA and POTA blocks can sit on the same page.
 
 = Can I switch between metric and imperial units? =
 
-Yes — Settings → Activator Toolkit for SOTA → Unit System. All statistics and the elevation chart convert automatically.
+Yes. Settings → Activator Toolkit → Display → Unit System. All statistics and charts convert automatically.
 
 = Can I customize the appearance? =
 
-Yes — Settings → Activator Toolkit for SOTA lets you set background color, text color, transparent background, S2S highlight colors, and whether to use your theme's font.
+Yes. Settings → Activator Toolkit lets you set background and text colors, S2S and P2P highlight colors, headlines, block width, and whether to use your theme's font.
 
 == Screenshots ==
 
-1. GPX track map with elevation chart and "Zoom to Activation Zone" button
-2. Hiking statistics grid showing time, distance, elevation, and speed
-3. Contact table with S2S highlighting
+1. SOTA: GPX track map with elevation chart and "Zoom to Activation Zone" button
+2. SOTA: Hiking statistics showing time, distance, elevation, and speed
+3. SOTA: Contact table with Summit-to-Summit highlighting
 4. Interactive contact map showing QSO locations by band
-5. Block editor interface with file upload and manual override panel
+5. Block editor with file upload and manual override panel
 6. Settings page
+7. POTA: Contact map with the park pinned, a Park-to-Park contact popup, and the Furthest Contact tile
+8. POTA: Contacts table with the Their Park column and Park-to-Park contacts highlighted
+9. POTA: Block editor with the SOTA / POTA toggle and the auto-detected park reference
+10. Settings: General tab with a plain-language overview and the default mode choice
+11. Settings: Parks (POTA) tab
 
 == Changelog ==
 
+= 1.2.0 =
+* New: Parks on the Air (POTA) support. Each block has a SOTA / POTA toggle; POTA mode takes your ADIF log and shows your park, a contact map with your park pinned, and a contacts table
+* New: Park lookups from the POTA park database, with names and official locations; activations from several parks at once are supported
+* New: Park-to-Park (P2P) contacts are placed at their park on the map, highlighted in the table, and marked with a P2P badge, with their own colors in Settings
+* New: "Furthest contact" tile on the contact map, for both SOTA and POTA; click it to jump to that station
+* New: SOTLAS activation zones (about 1 meter detail) are now used first, then Activation.Zone, then the radius circle; each post can override the zone source
+* New: Settings reorganized into General, Summits (SOTA), Parks (POTA), Display, Callsign Lookup, Developer, and Cache tabs; the General tab explains the plugin and sets the default mode for new blocks
+* New: Hike statistics show Total Distance; Elevation Gain and Peak Elevation are combined into one tile
+* Improve: Plugin renamed to "Activator Toolkit for SOTA & POTA" with a new logo and banner
+* Improve: A log file with no contacts now shows a short message instead of an empty map and table
+* Improve: Existing posts are unaffected. Blocks made before this version always stay in SOTA mode
+
 = 1.1.10 =
-* Fix: Replaced the "Minimal" map tile source (CartoDB), which began requiring an API key and showing an "API KEY REQUIRED" watermark, with OpenStreetMap tiles plus a muted CSS filter — same look, no API key needed. Affects both the Contact Map and the GPX map's Minimal layer.
+* Fix: Replaced the "Minimal" map tile source (CartoDB), which began requiring an API key and showing an "API KEY REQUIRED" watermark, with OpenStreetMap tiles plus a muted CSS filter: same look, no API key needed. Affects both the Contact Map and the GPX map's Minimal layer.
 * Improve: "Minimal" is now the default map style for new plugin installs
 * Improve: Tested up to WordPress 7.1
 
@@ -176,7 +236,7 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 * Improve: ADIF frequency values are normalized to a minimum of 3 decimal places (144.2 → 144.200); up to 5 decimal places are preserved when present
 
 = 1.1.5 =
-* Improve: WordPress 7.0 compatibility — block editor uses current wp.blockEditor API instead of deprecated wp.editor for MediaUpload
+* Improve: WordPress 7.0 compatibility: block editor uses current wp.blockEditor API instead of deprecated wp.editor for MediaUpload
 * Improve: Block editor buttons use current variant prop instead of deprecated isPrimary/isSecondary
 * Improve: Block category updated from deprecated 'common' to 'text'
 * Improve: Tested up to WordPress 7.0
@@ -185,7 +245,7 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 * Improve: Contact map loading animation now appears immediately when the iframe loads; callsign lookups happen in the background instead of blocking the initial render
 
 = 1.1.4 =
-* New: ADIF log file support — upload .adif or .adi files in addition to SOTA CSV; format is detected automatically
+* New: ADIF log file support: upload .adif or .adi files in addition to SOTA CSV; format is detected automatically
 * New: Modal prompts for summit reference when log file does not include one (works for both CSV and ADIF)
 * New: Summit Reference field in block inspector sidebar for easy review and correction after upload
 * New: Hovering a row in the contacts table highlights the corresponding marker on the contact map
@@ -204,24 +264,24 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 * Fix: Contact map initial zoom now correctly fits all contacts within the visible frame
 
 = 1.1.1 =
-* New: Granular cache management tab — view, filter, and delete cached callsign locations individually
+* New: Granular cache management tab: view, filter, and delete cached callsign locations individually
 * Improve: Plugin UI icons replaced with a consistent minimalist SVG icon set
 * Improve: Visual refresh across stats display and settings pages
 * Fix: Contact map fitBounds timing corrected for reliable initial zoom on all themes
 
 = 1.1.0 =
-* New: Callook.info lookup — automatic, free, no account needed; resolves US callsigns from FCC data
-* New: HamQTH lookup — free account, international coverage; runs after Callook for non-US callsigns
+* New: Callook.info lookup: automatic, free, no account needed; resolves US callsigns from FCC data
+* New: HamQTH lookup: free account, international coverage; runs after Callook for non-US callsigns
 * Improve: Callsign lookup now tries Callook → HamQTH → QRZ in priority order before marking a contact unresolved
 * Improve: Settings page reorganized into tabs: Display, Callsign Lookup, GPX Track, Developer
 * Improve: Cache clearing now preserves S2S summit location cache; only callsign lookup entries are cleared
-* Fix: Debug Mode (public) checkbox was not being saved — now works correctly
+* Fix: Debug Mode (public) checkbox was not being saved: now works correctly
 
 = 1.0.7 =
-* Fix: QRZ password now preserved exactly as entered — special characters no longer stripped before encryption
+* Fix: QRZ password now preserved exactly as entered: special characters no longer stripped before encryption
 
 = 1.0.6 =
-* Fix: Contact map assets now use wp_enqueue_style(), wp_enqueue_script(), and wp_add_inline_script() with wp_print_styles()/wp_print_scripts() called manually — correct WordPress API usage for a standalone HTML page served via wp_ajax_*
+* Fix: Contact map assets now use wp_enqueue_style(), wp_enqueue_script(), and wp_add_inline_script() with wp_print_styles()/wp_print_scripts() called manually: correct WordPress API usage for a standalone HTML page served via wp_ajax_*
 
 = 1.0.5 =
 * Fix: Contact map JS moved to external contact-map.js; inline script reduced to a single JSON data assignment (wp_localize_script pattern)
@@ -240,35 +300,35 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 * IMPROVED: Contact map served via admin-ajax.php instead of direct file access
 * IMPROVED: Added sanitize callbacks to all register_setting() calls
 * IMPROVED: Chart.js updated from 4.4.0 to 4.5.1
-* FIXED: All WordPress Plugin Check tool errors and warnings resolved — passes clean with no ERRORs
+* FIXED: All WordPress Plugin Check tool errors and warnings resolved: passes clean with no ERRORs
 
 = 1.0.3 =
-* FIXED: Contact map initial zoom now fits all contacts and summit optimally — map waits for container to fully render before fitting bounds
+* FIXED: Contact map initial zoom now fits all contacts and summit optimally: map waits for container to fully render before fitting bounds
 
 = 1.0.2 =
-* NEW: Persistent location cache using a dedicated `wp_sota_magic_locations` database table — QRZ callsign locations stored permanently for historical accuracy; SOTA summit coordinates cached 90 days
-* NEW: "No location found" panel on contact map — contacts that could not be located are listed rather than silently dropped
-* NEW: Debug Mode split into two options — admin-only (safe to leave on) and public (for testing while logged out)
+* NEW: Persistent location cache using a dedicated `wp_sota_magic_locations` database table: QRZ callsign locations stored permanently for historical accuracy; SOTA summit coordinates cached 90 days
+* NEW: "No location found" panel on contact map: contacts that could not be located are listed rather than silently dropped
+* NEW: Debug Mode split into two options: admin-only (safe to leave on) and public (for testing while logged out)
 * IMPROVED: QRZ callsign lookups now include a user-agent header, fixing lookups that were silently failing
-* IMPROVED: Settings page version number is now read dynamically from the plugin header — always stays in sync
+* IMPROVED: Settings page version number is now read dynamically from the plugin header: always stays in sync
 * IMPROVED: Debug panel now shows unresolved contact count, reason per callsign, and raw QRZ XML response for failed lookups
 * FIXED: Hiking speed statistic not recalculating when hiking distance or time manual overrides were applied
 * FIXED: QRZ password now stored encrypted (AES-256-CBC) rather than plain text
 
 = 1.0.1 =
-* NEW: Per-post "Hide GPX hike statistics from post" checkbox in block editor — suppresses stats display while keeping map, activation zone, and contact map fully functional
-* FIXED: Contact map lines not drawing — SOTA API summit lookup was broken by missing stream context and user-agent header
-* FIXED: Elevation chart showing dead space on the right — Chart.js was auto-extending x-axis beyond actual track length
+* NEW: Per-post "Hide GPX hike statistics from post" checkbox in block editor: suppresses stats display while keeping map, activation zone, and contact map fully functional
+* FIXED: Contact map lines not drawing: SOTA API summit lookup was broken by missing stream context and user-agent header
+* FIXED: Elevation chart showing dead space on the right: Chart.js was auto-extending x-axis beyond actual track length
 * ADDED: Admin-only debug panel on the contact map (visible only when Debug Mode is enabled in Settings)
 
 = 1.0.0 =
-* MAJOR: Plugin is now fully standalone — no other plugins required
+* MAJOR: Plugin is now fully standalone: no other plugins required
 * NEW: Self-contained Leaflet 1.9.4 map replaces WP-GPX Maps dependency
 * NEW: Elevation profile chart (Chart.js 4.4.0) below the map with hover-to-map interaction
 * NEW: "Zoom to Activation Zone" button above the map
-* NEW: Three selectable base layers — Topographic, OpenStreetMap, CartoDB Minimal
+* NEW: Three selectable base layers: Topographic, OpenStreetMap, CartoDB Minimal
 * NEW: Activation zone overlay uses precise red polygon (API) or orange circle (fallback)
-* IMPROVED: All map libraries (Leaflet, Chart.js) bundled locally — no CDN calls
+* IMPROVED: All map libraries (Leaflet, Chart.js) bundled locally: no CDN calls
 * IMPROVED: GPX track points sampled to max 800 for efficient JSON delivery
 * IMPROVED: Summit coordinates fall back to highest track point when CSV is absent
 * FIXED: Removed all dependency on WP-GPX Maps plugin
@@ -315,37 +375,52 @@ Yes — Settings → Activator Toolkit for SOTA lets you set background color, t
 
 == Upgrade Notice ==
 
+= 1.2.0 =
+Adds Parks on the Air (POTA) support with a SOTA / POTA toggle on each block. Your existing SOTA posts are not changed.
+
 = 1.0.0 =
-Major release. The WP-GPX Maps plugin dependency has been completely removed. If you had WP-GPX Maps installed only for SOTA Magic, you may now deactivate it. All map and chart functionality is now built in.
+Major release. The WP-GPX Maps plugin dependency has been completely removed. If you had WP-GPX Maps installed only for this plugin, you may now deactivate it. All map and chart functionality is now built in.
 
 == External Services ==
 
 This plugin connects to the following external services. By using this plugin you agree to their respective terms.
 
 **SOTA API** (api2.sota.org.uk)
-Used to retrieve official summit coordinates (for the summit marker and S2S contact locations). No authentication required. No personal data is sent.
+SOTA mode only. Used to retrieve official summit coordinates for the summit marker and Summit-to-Summit contact locations. No authentication required. No personal data is sent.
 Terms: https://www.sota.org.uk
 
+**SOTLAS activation zones** (az.sotl.as)
+SOTA mode only. Used to retrieve high-detail activation zone boundaries for a summit. Only the summit reference is sent. Results are cached for up to a year.
+Terms: https://sotl.as
+
 **Activation.Zone API** (api.activation.zone)
-Used to retrieve the precise SOTA activation zone polygon for a given summit reference. No authentication required. The summit reference, coordinates, and elevation are sent to the API. Created by N6ARA.
+SOTA mode only. Used to retrieve the activation zone for a summit when SOTLAS has none. The summit reference, coordinates, and elevation are sent. Created by N6ARA.
 Terms: https://activation.zone
 
+**POTA API** (api.pota.app)
+POTA mode only. Used to look up a park's name and official location from its park reference (for example US-8144). Only the park reference is sent. Results are cached for 90 days.
+Terms: https://pota.app
+
+**Callook.info** (callook.info)
+Used to look up the location of US callsigns for the contact map when the log has no grid square. Only the callsign is sent. No account required.
+Terms: https://callook.info
+
+**HamQTH** (www.hamqth.com)
+Used to look up callsign locations worldwide when HamQTH credentials are entered in settings. Your HamQTH username and password are sent to HamQTH for authentication.
+Terms: https://www.hamqth.com
+
 **QRZ.com XML API** (xmldata.qrz.com)
-Used to look up contact operator locations for the contact map. Only contacted when the contact map is enabled and QRZ credentials are provided in settings. Your QRZ username and password are sent to QRZ.com for authentication.
+Used to look up callsign locations when QRZ credentials are entered in settings. Your QRZ username and password are sent to QRZ.com for authentication.
 Terms: https://www.qrz.com/page/terms_of_service.html
 
-**OpenStreetMap tile servers** ({s}.tile.openstreetmap.org)
-Used as a base map layer option. Standard tile requests including your IP address are sent to OpenStreetMap servers.
+**OpenStreetMap tile servers** (tile.openstreetmap.org)
+Used for the OpenStreetMap and Minimal base map layers. Standard tile requests, including your visitors' IP addresses, are sent to OpenStreetMap servers.
 Terms: https://wiki.osmfoundation.org/wiki/Terms_of_Use
 
-**OpenTopoMap tile servers** ({s}.tile.opentopomap.org)
-Used as the default base map layer (topographic). Standard tile requests are sent to OpenTopoMap servers.
+**OpenTopoMap tile servers** (tile.opentopomap.org)
+Used for the Topographic base map layer. Standard tile requests are sent to OpenTopoMap servers.
 Terms: https://opentopomap.org/about
-
-**CartoDB/CARTO tile servers** ({s}.basemaps.cartocdn.com)
-Used as a minimal base map layer option. Standard tile requests are sent to CARTO servers.
-Terms: https://carto.com/legal/
 
 == Privacy Policy ==
 
-SOTA Magic does not collect, store, or transmit any personal data beyond what is described in the External Services section above. GPX files and CSV files are stored in your WordPress media library and processed on your own server. QRZ.com credentials are stored in your WordPress options table and are never transmitted to anyone other than QRZ.com.
+Activator Toolkit does not collect, store, or transmit any personal data beyond what is described in the External Services section above. GPX and log files are stored in your WordPress media library and processed on your own server. Lookup service credentials are stored in your WordPress options table and are only ever sent to the service they belong to.

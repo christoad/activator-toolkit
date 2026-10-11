@@ -91,14 +91,14 @@ function sota_magic_settings_page() {
             <div id="sota-tab-general" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'general' ? '' : 'display:none;'; ?>">
                 <table class="form-table">
                     <tr><th colspan="2"><h2>What This Plugin Does</h2></th></tr>
-                    <tr><th colspan="2"><div style="background:#f0f0f0;padding:12px 16px;border-left:4px solid #0073aa;margin:6px 0;line-height:1.7;max-width:760px;">
+                    <tr><td colspan="2" style="padding-left:0;"><div style="background:#f0f0f0;padding:12px 16px;border-left:4px solid #0073aa;margin:6px 0;line-height:1.7;max-width:760px;">
                         <p style="margin-top:0;">Activator Toolkit turns the files from a radio activation into a ready-made section of a WordPress post. Add the <strong>Activator Toolkit</strong> block to a post, choose a mode, upload your files, and the plugin builds the maps and tables for you.</p>
                         <p><strong>Summits on the Air (SOTA) mode</strong><br>
                         Upload a GPX track and a SOTA CSV or ADIF log. You get an interactive map of your hike with the activation zone, an elevation chart, hiking and activation statistics, a contact table, and a map of everyone you worked. Summit-to-Summit (S2S) contacts are highlighted.</p>
                         <p><strong>Parks on the Air (POTA) mode</strong><br>
                         Upload your POTA ADIF log. You get a map of every station you worked, with lines back to your park, plus a contact table. Park-to-Park (P2P) contacts are highlighted, and activations from several parks at once are supported.</p>
                         <p style="margin-bottom:0;">Station locations come from grid squares in your log or from callsign lookups, and are saved so the map shows where each station was at the time of your activation.</p>
-                    </div></th></tr>
+                    </div></td></tr>
 
                     <tr><th colspan="2"><h2>Default Mode</h2></th></tr>
                     <tr><th>New blocks start in</th><td>
@@ -108,13 +108,13 @@ function sota_magic_settings_page() {
                     </td></tr>
 
                     <tr><th colspan="2"><h2>Where To Find Things</h2></th></tr>
-                    <tr><th colspan="2"><div style="max-width:760px;line-height:1.7;">
+                    <tr><td colspan="2" style="padding-left:0;"><div style="max-width:760px;line-height:1.7;">
                         <strong>Summits (SOTA)</strong>: activation zone, GPX statistics, units, hike map layer, S2S colors.<br>
                         <strong>Parks (POTA)</strong>: P2P colors and notes on how POTA logs are read.<br>
                         <strong>Display</strong>: headlines, colors, contact map, and block width (both modes).<br>
                         <strong>Callsign Lookup</strong>: how contact locations are found (both modes).<br>
                         <strong>Developer</strong> and <strong>Cache</strong>: troubleshooting tools.
-                    </div></th></tr>
+                    </div></td></tr>
                 </table>
             </div>
 
@@ -122,7 +122,7 @@ function sota_magic_settings_page() {
             <div id="sota-tab-sota" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'sota' ? '' : 'display:none;'; ?>">
                 <table class="form-table">
                     <tr><th colspan="2"><h2>Activation Zone</h2></th></tr>
-                    <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
+                    <tr><td colspan="2" style="padding-left:0;"><p style="background:#f0f0f0;padding:10px;border-left:4px solid #0073aa;margin:10px 0;">
                         <strong>How Hiking vs. Activation Time is Calculated:</strong><br>
                         The plugin looks for the activation zone in this order:<br>
                         <strong>1. SOTLAS (most detailed):</strong> Terrain-based boundaries at roughly 1 meter detail, from <a href="https://sotl.as" target="_blank">sotl.as</a>. SOTLAS is still adding associations, so a summit without a boundary today is checked again after 30 days.<br>
@@ -130,7 +130,7 @@ function sota_magic_settings_page() {
                         <strong>3. Radius circle:</strong> A simple circle around the highest GPS point. Used if neither service has a boundary, or if terrain lookups are turned off.<br><br>
                         Both services follow the 25m vertical drop rule. You can force a specific source for a single post in the block's Statistics Overrides.<br><br>
                         <strong>All time spent within the activation zone counts as activation time</strong> (regardless of movement). All other time counts as hiking time, with rest breaks shown as a sub-note.
-                    </p></th></tr>
+                    </p></td></tr>
                     <tr><th>Use Terrain-Based Zones</th><td>
                         <input type="checkbox" name="sota_use_azapi" value="1" <?php checked(1, get_option('sota_use_azapi')); ?> />
                         <br><small>Look up SOTLAS and Activation.Zone boundaries. If turned off, or if neither has a boundary, the radius circle is used.</small>
@@ -178,13 +178,13 @@ function sota_magic_settings_page() {
             <div id="sota-tab-pota" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'pota' ? '' : 'display:none;'; ?>">
                 <table class="form-table">
                     <tr><th colspan="2"><h2>How POTA Mode Works</h2></th></tr>
-                    <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px 14px;border-left:4px solid #0073aa;margin:10px 0;line-height:1.8;max-width:760px;">
+                    <tr><td colspan="2" style="padding-left:0;"><p style="background:#f0f0f0;padding:10px 14px;border-left:4px solid #0073aa;margin:10px 0;line-height:1.8;max-width:760px;">
                         <strong>Your log file does the work.</strong> Upload the ADIF (.adi or .adif) log you submit to pota.app. The plugin reads your park reference from the log (the MY_SIG_INFO field) and finds each park&rsquo;s location from the official POTA database.<br>
                         <strong>Several parks at once:</strong> if you activated more than one park from the same spot, all of them are shown, and distances are measured from the first park.<br>
                         <strong>Park-to-Park (P2P):</strong> when a contact logged their own park, their dot is placed at that park and the contact is highlighted in the table.<br>
                         <strong>No activation zone:</strong> POTA does not publish park boundaries, so each park is shown as a single pin at its official location.<br>
                         <strong>Everything else:</strong> headlines, colors, block width, and callsign lookups are shared with SOTA mode and live on the Display and Callsign Lookup tabs.
-                    </p></th></tr>
+                    </p></td></tr>
 
                     <tr><th colspan="2"><h2>Park-to-Park (P2P) Highlighting</h2></th></tr>
                     <tr><th>P2P Background</th><td><input type="color" name="pota_p2p_highlight" value="<?php echo esc_attr(get_option('pota_p2p_highlight', '#e8f5e9')); ?>" /></td></tr>
@@ -244,7 +244,7 @@ function sota_magic_settings_page() {
             <div id="sota-tab-lookup" class="sota-tab-panel" style="<?php echo $sota_current_tab === 'lookup' ? '' : 'display:none;'; ?>">
                 <table class="form-table">
                     <tr><th colspan="2"><h2>How Contact Locations Are Determined</h2></th></tr>
-                    <tr><th colspan="2"><p style="background:#f0f0f0;padding:10px 14px;border-left:4px solid #0073aa;margin:10px 0;line-height:1.8;">
+                    <tr><td colspan="2" style="padding-left:0;"><p style="background:#f0f0f0;padding:10px 14px;border-left:4px solid #0073aa;margin:10px 0;line-height:1.8;">
                         <strong>How the plugin figures out where each contact was located:</strong><br>
                         <strong>1. Summit-to-Summit (S2S) or Park-to-Park (P2P)</strong>: if the log shows the other station was also on a summit or in a park, the plugin uses that summit&rsquo;s or park&rsquo;s official coordinates. No lookup needed.<br>
                         <strong>2. Grid square in log file</strong>: if your logging app recorded a Maidenhead grid square for the contact (common in ADIF/.adi files), the plugin plots directly from that. No lookup needed.<br>
@@ -253,7 +253,7 @@ function sota_magic_settings_page() {
                         <strong>5. HamQTH</strong>: free lookup for international callsigns. Requires a free HamQTH account (see below).<br>
                         <strong>6. QRZ.com</strong>: international lookup. Requires a paid QRZ XML subscription (see below).<br>
                         <br>Once a location is found it&rsquo;s saved permanently. The address at the <em>time of your activation</em> is kept intentionally. If they&rsquo;ve moved since, the cached location is still the historically accurate one.
-                    </p></th></tr>
+                    </p></td></tr>
 
                     <tr><th colspan="2"><h2>Callook.info <span style="font-weight:normal;font-size:13px;color:#28a745;">&#10003; Free, no account needed</span></h2></th></tr>
                     <tr><th colspan="2"><p style="color:#555;padding:0 0 10px;">Callook.info serves US callsigns from FCC data. It runs automatically for every contact, with no configuration needed. Non-US callsigns fall through to HamQTH or QRZ.</p></th></tr>

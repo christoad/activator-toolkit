@@ -1,4 +1,4 @@
-/* contact-map.js — SOTA / POTA Contact Map renderer
+/* contact-map.js: SOTA / POTA Contact Map renderer
  * Fetches map data from sotaContactMapParams.dataUrl, then renders the Leaflet map.
  * The HTML shell (loading animation) is already visible before this script runs.
  */
@@ -218,7 +218,7 @@
         html += 'Fresh lookups: <strong>' + meta.fresh_count + '</strong> &nbsp;|&nbsp; ';
         html += 'Unresolved: <strong>' + meta.unresolved_count + '</strong><br>';
         html += '<hr style="margin:4px 0;">';
-        html += 'Locations table: <strong>' + meta.locations_table + '</strong> — <strong>' + meta.locations_table_rows + ' row(s) stored</strong><br>';
+        html += 'Locations table: <strong>' + meta.locations_table + '</strong>, <strong>' + meta.locations_table_rows + ' row(s) stored</strong><br>';
         html += 'DB error: <strong>' + ( meta.db_error || 'none' ) + '</strong><br>';
         html += '<hr style="margin:4px 0;">';
 
@@ -233,7 +233,7 @@
             html += '<hr style="margin:4px 0;">';
             html += '<strong style="color:#c0392b;">⚠ Unresolved contacts (not shown on map):</strong><br>';
             meta.unresolved.forEach( function ( ur ) {
-                html += '&nbsp;• <strong>' + ur.callsign + '</strong> — ' + ur.reason + '<br>';
+                html += '&nbsp;• <strong>' + ur.callsign + '</strong>: ' + ur.reason + '<br>';
             } );
         }
 

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Logo Options</title>
+<style>
+  :root { --ink:#1c1b19; --red:#fb0032; --topo:#8c8a86; --bg:#f6f5f2; --card:#fff; --muted:#6b6a66; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:24px 16px 8px; max-width:1100px; margin:0 auto; }
+  h1 { margin:0 0 6px; font-size:1.5rem; }
+  header p { margin:0; color:var(--muted); line-height:1.5; }
+  header a { color:var(--muted); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:16px; padding:16px; max-width:1100px; margin:0 auto; }
+  .card { background:var(--card); border-radius:14px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .card h2 { margin:0 0 4px; font-size:1.1rem; }
+  .card p { margin:0 0 14px; color:var(--muted); font-size:.92rem; line-height:1.45; }
+  .hero { display:flex; justify-content:center; padding:8px 0 14px; }
+  .hero svg { width:220px; height:220px; }
+  .sizes { display:flex; align-items:center; justify-content:center; gap:14px; border-top:1px solid #eee; padding-top:14px; }
+  .sizes svg { display:block; }
+  .dark { background:#1c1b19; border-radius:10px; padding:8px; }
+  .dark svg { --ink:#f2f1ee; --topo:#b9b6b0; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <clipPath id="disc"><circle cx="62.5" cy="62.5" r="49.2"/></clipPath>
+
+    <!-- One organic contour ring, centered on 0,0; scaled copies make a hill -->
+    <path id="ring" vector-effect="non-scaling-stroke" d="M-20 0C-21-11-9-18 3-17 15-16 23-7 20 4 18 14 7 19-5 17-15 15-19 9-20 0Z"/>
+    <path id="ring2" vector-effect="non-scaling-stroke" d="M-18-2C-17-13-4-17 7-14 17-11 21-1 17 8 13 16 1 18-9 15-16 12-19 5-18-2Z"/>
+
+    <!-- Topo map: two hills plus a few contours running off the edge -->
+    <g id="topo" clip-path="url(#disc)" fill="none" stroke="var(--topo)" stroke-width=".7" vector-effect="non-scaling-stroke">
+      <g transform="translate(42 44)">
+        <use href="#ring" transform="scale(.28)" vector-effect="non-scaling-stroke"/>
+        <use href="#ring" transform="rotate(8) scale(.6)"/>
+        <use href="#ring" transform="rotate(-6) scale(.95 .9)"/>
+        <use href="#ring" transform="rotate(12) scale(1.35 1.25)"/>
+        <use href="#ring" transform="rotate(4) scale(1.8 1.6)"/>
+        <use href="#ring" transform="rotate(-4) scale(2.3 2.05)"/>
+      </g>
+      <g transform="translate(94 92)">
+        <use href="#ring2" transform="scale(.35)"/>
+        <use href="#ring2" transform="rotate(-10) scale(.75)"/>
+        <use href="#ring2" transform="rotate(6) scale(1.15 1.05)"/>
+      </g>
+      <path d="M8 104C30 96 46 108 66 101S98 112 120 98"/>
+      <path d="M4 114C28 106 48 117 70 110S102 120 124 108"/>
+      <path d="M96 4C102 20 116 26 122 42"/>
+      <path d="M84 2C90 22 108 32 118 54"/>
+    </g>
+
+    <!-- 1A. Contact Web on topo -->
+    <symbol id="w" viewBox="0 0 125 125">
+      <g opacity=".55"><use href="#topo"/></g>
+      <circle cx="62.5" cy="62.5" r="50" fill="none" stroke="var(--ink)" stroke-width="1.5"/>
+      <g stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round" fill="none">
+        <path d="M58 70L28 46M58 70L46 30M58 70L92 36M58 70L96 78M58 70L74 100M58 70L32 90"/>
+      </g>
+      <g fill="var(--ink)">
+        <circle cx="28" cy="46" r="3"/><circle cx="46" cy="30" r="3"/><circle cx="92" cy="36" r="3"/>
+        <circle cx="96" cy="78" r="3"/><circle cx="74" cy="100" r="3"/><circle cx="32" cy="90" r="3"/>
+      </g>
+      <circle cx="58" cy="70" r="15" fill="none" stroke="var(--red)" stroke-width=".8" opacity=".25"/>
+      <circle cx="58" cy="70" r="9" fill="none" stroke="var(--red)" stroke-width="1.2" opacity=".5"/>
+      <circle cx="58" cy="70" r="4.5" fill="var(--red)"/>
+    </symbol>
+
+    <!-- 1B. Contact Web, station on the hilltop -->
+    <symbol id="w2" viewBox="0 0 125 125">
+      <g opacity=".55"><use href="#topo"/></g>
+      <circle cx="62.5" cy="62.5" r="50" fill="none" stroke="var(--ink)" stroke-width="1.5"/>
+      <g stroke="var(--ink)" stroke-width="1.5" stroke-linecap="round" fill="none">
+        <path d="M42 44L22 66M42 44L64 22M42 44L98 50M42 44L88 92M42 44L58 104"/>
+      </g>
+      <g fill="var(--ink)">
+        <circle cx="22" cy="66" r="3"/><circle cx="64" cy="22" r="3"/><circle cx="98" cy="50" r="3"/>
+        <circle cx="88" cy="92" r="3"/><circle cx="58" cy="104" r="3"/>
+      </g>
+      <circle cx="42" cy="44" r="15" fill="none" stroke="var(--red)" stroke-width=".8" opacity=".25"/>
+      <circle cx="42" cy="44" r="9" fill="none" stroke="var(--red)" stroke-width="1.2" opacity=".5"/>
+      <circle cx="42" cy="44" r="4.5" fill="var(--red)"/>
+    </symbol>
+
+    <!-- 5A. Signal Pin on topo -->
+    <symbol id="p" viewBox="0 0 125 125">
+      <g opacity=".55"><use href="#topo"/></g>
+      <circle cx="62.5" cy="62.5" r="50" fill="none" stroke="var(--ink)" stroke-width="1.5"/>
+      <g stroke="var(--ink)" stroke-width=".9" stroke-dasharray="2 3" opacity=".6"><path d="M27 40L42 52M98 36L82 50M100 74L80 66M25 76L44 66"/></g>
+      <g fill="var(--ink)"><circle cx="27" cy="40" r="2.6"/><circle cx="98" cy="36" r="2.6"/><circle cx="100" cy="74" r="2.6"/><circle cx="25" cy="76" r="2.6"/></g>
+      <path d="M62.5 98C50 80 42 68 42 56a20.5 20.5 0 0 1 41 0c0 12-8 24-20.5 42z" fill="var(--card, #fff)" fill-opacity=".85" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/>
+      <circle cx="62.5" cy="56" r="3.5" fill="var(--red)"/>
+      <g fill="none" stroke="var(--red)" stroke-linecap="round">
+        <path d="M56 50a9 9 0 0 0 0 12M69 50a9 9 0 0 1 0 12" stroke-width="1.8" opacity=".8"/>
+        <path d="M51 45.5a15.5 15.5 0 0 0 0 21M74 45.5a15.5 15.5 0 0 1 0 21" stroke-width="1.3" opacity=".45"/>
+      </g>
+    </symbol>
+
+    <!-- 5B. Signal Pin, solid red pin -->
+    <symbol id="p2" viewBox="0 0 125 125">
+      <g opacity=".55"><use href="#topo"/></g>
+      <circle cx="62.5" cy="62.5" r="50" fill="none" stroke="var(--ink)" stroke-width="1.5"/>
+      <g stroke="var(--ink)" stroke-width=".9" stroke-dasharray="2 3" opacity=".6"><path d="M27 40L44 52M98 36L81 50M100 74L80 66M25 76L45 66"/></g>
+      <g fill="var(--ink)"><circle cx="27" cy="40" r="2.6"/><circle cx="98" cy="36" r="2.6"/><circle cx="100" cy="74" r="2.6"/><circle cx="25" cy="76" r="2.6"/></g>
+      <path d="M62.5 98C50 80 42 68 42 56a20.5 20.5 0 0 1 41 0c0 12-8 24-20.5 42z" fill="var(--red)"/>
+      <circle cx="62.5" cy="56" r="3.3" fill="#fff"/>
+      <g fill="none" stroke="#fff" stroke-linecap="round">
+        <path d="M56.5 50.5a8.5 8.5 0 0 0 0 11M68.5 50.5a8.5 8.5 0 0 1 0 11" stroke-width="1.8"/>
+        <path d="M52 46.5a14.5 14.5 0 0 0 0 19M73 46.5a14.5 14.5 0 0 1 0 19" stroke-width="1.4" opacity=".7"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<header>
+  <h1>Activator Toolkit: Logo Options, Round 2</h1>
+  <p>Options 1 and 5 with a topographic map behind them instead of latitude and longitude lines. Two takes on each. <a href="round1.html">See round 1</a>.</p>
+</header>
+
+<main class="grid">
+  <section class="card">
+    <h2>1A. Contact Web on Topo</h2>
+    <p>Same contact web as before, now over contour lines of a hill and the slopes around it.</p>
+    <div class="hero"><svg><use href="#w"/></svg></div>
+    <div class="sizes"><svg width="128" height="128"><use href="#w"/></svg><svg width="48" height="48"><use href="#w"/></svg><svg width="24" height="24"><use href="#w"/></svg><div class="dark"><svg width="48" height="48"><use href="#w"/></svg></div></div>
+  </section>
+
+  <section class="card">
+    <h2>1B. Station on the Hilltop</h2>
+    <p>The red station sits right at the top of the hill's contour rings, so it reads as "operating from a summit or park", with contacts radiating out.</p>
+    <div class="hero"><svg><use href="#w2"/></svg></div>
+    <div class="sizes"><svg width="128" height="128"><use href="#w2"/></svg><svg width="48" height="48"><use href="#w2"/></svg><svg width="24" height="24"><use href="#w2"/></svg><div class="dark"><svg width="48" height="48"><use href="#w2"/></svg></div></div>
+  </section>
+
+  <section class="card">
+    <h2>5A. Signal Pin on Topo</h2>
+    <p>The outlined pin with radio waves, sitting on the topo map with dotted links to contacts. The pin has a light fill so the contours don't run through it.</p>
+    <div class="hero"><svg><use href="#p"/></svg></div>
+    <div class="sizes"><svg width="128" height="128"><use href="#p"/></svg><svg width="48" height="48"><use href="#p"/></svg><svg width="24" height="24"><use href="#p"/></svg><div class="dark"><svg width="48" height="48"><use href="#p"/></svg></div></div>
+  </section>
+
+  <section class="card">
+    <h2>5B. Solid Red Pin</h2>
+    <p>Same idea with a solid red pin and white radio waves. Bolder, and the easiest of the four to recognize at tiny sizes.</p>
+    <div class="hero"><svg><use href="#p2"/></svg></div>
+    <div class="sizes"><svg width="128" height="128"><use href="#p2"/></svg><svg width="48" height="48"><use href="#p2"/></svg><svg width="24" height="24"><use href="#p2"/></svg><div class="dark"><svg width="48" height="48"><use href="#p2"/></svg></div></div>
+  </section>
+</main>
+</body>
+</html>

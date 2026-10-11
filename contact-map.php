@@ -37,7 +37,7 @@ $sota_cm_data_url = add_query_arg( [
     '_nonce'     => wp_create_nonce( 'sota_magic_contact_map' ),
 ], admin_url( 'admin-ajax.php' ) );
 
-// Enqueue assets using WordPress APIs (required by WP.org — no raw <script>/<link> tags)
+// Enqueue assets using WordPress APIs (required by WP.org; no raw <script>/<link> tags)
 wp_enqueue_style(  'sota-cm-leaflet',    plugins_url( 'lib/leaflet.css',  __FILE__ ), [],                       '1.9.4' );
 wp_enqueue_style(  'sota-cm-css',        plugins_url( 'contact-map.css',  __FILE__ ), [],                       '1.0.6' );
 wp_enqueue_script( 'sota-cm-leaflet-js', plugins_url( 'lib/leaflet.js',   __FILE__ ), [],                       '1.9.4', false );

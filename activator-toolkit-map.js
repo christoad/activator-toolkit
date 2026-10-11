@@ -1,4 +1,4 @@
-/* activator-toolkit-map.js — Self-contained GPX map + elevation chart for Activator Toolkit for SOTA
+/* activator-toolkit-map.js: Self-contained GPX map + elevation chart for Activator Toolkit for SOTA
  * No dependency on WP-GPX Maps plugin.
  *
  * Called once per block (from wp_add_inline_script in footer):
@@ -181,7 +181,7 @@ window.sotaMagicInitMap = function (mapId, data) {
         radius: 7, color: '#fff', fillColor: '#e67e00',
         fillOpacity: 1, weight: 2, interactive: false
     });
-    // Added/removed dynamically — not on map yet
+    // Added/removed dynamically; not on map yet
 
     // ── Chart.js elevation chart ──────────────────────────────────────────────
     var chartCanvas = document.getElementById(mapId + '-chart');

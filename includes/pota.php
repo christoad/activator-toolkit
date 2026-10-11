@@ -116,6 +116,10 @@ function sota_magic_render_pota_data( $atts ) {
 
     $contacts = sota_magic_sort_contacts_by_time( sota_magic_parse_adif_contacts( $log_url, '', $park_override ) );
 
+    if ( ! $contacts ) {
+        return '<div class="sota-main-container"><p>' . esc_html__( 'No contacts were found in this log file.', 'activator-toolkit-for-sota' ) . '</p></div>';
+    }
+
     // Parks being activated: everything named in the log plus the editor field.
     $my_parks = sota_magic_park_refs( $park_override );
     foreach ( $contacts as $c ) {

@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Activator Toolkit for SOTA & POTA
  * Plugin URI: https://www.ki6cr.com/sota-magic-plugin-for-wordpress/
- * Description: Display your SOTA activation data beautifully — GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. Accepts SOTA CSV, ADIF, and ADI log files. No other plugins required.
- * Version: 1.1.10
+ * Description: Display your SOTA and POTA activations: GPX track maps with elevation chart, hiking statistics, contact tables, and an interactive contact map. Accepts SOTA CSV, ADIF, and ADI log files. No other plugins required.
+ * Version: 1.2.0
  * Author: KI6CR
  * Author URI: https://ki6cr.com
  * License: GPLv2 or later
@@ -126,7 +126,7 @@ function sota_magic_sanitize_password( $value ) {
  * @param string $name  Icon slug (mountain|hike|radio|timer|trend-up|walk|peak|
  *                      pause|chart|pin|map|antenna|home|warning|info|gear|distance).
  * @param int    $size  Rendered px size (default 20).
- * @return string       SVG markup — not user-supplied; safe to echo unescaped.
+ * @return string       SVG markup, not user-supplied; safe to echo unescaped.
  */
 function sota_magic_svg_icon( $name, $size = 20 ) {
     $s   = (int) $size;
@@ -211,7 +211,7 @@ function sota_magic_svg_icon( $name, $size = 20 ) {
 
 /**
  * Outputs an SVG icon. Thin wrapper around sota_magic_svg_icon() so call sites
- * don't each need a phpcs:ignore — output is hardcoded, no user input involved.
+ * don't each need a phpcs:ignore; output is hardcoded, no user input involved.
  */
 function sota_magic_echo_svg( $name, $size = 20 ) {
     echo sota_magic_svg_icon( $name, $size ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- hardcoded SVG, no user input
@@ -1213,7 +1213,7 @@ function sota_magic_get_band_color( $frequency ) {
     return '#999999';
 }
 
-// AJAX: Serve the contact map iframe page (HTML shell only — data loads asynchronously)
+// AJAX: Serve the contact map iframe page (HTML shell only; data loads asynchronously)
 function sota_magic_render_contact_map_ajax() {
     if ( ! isset( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_nonce'] ) ), 'sota_magic_contact_map' ) ) {
         wp_die( 'Invalid request.', '', [ 'response' => 403 ] );
@@ -1350,7 +1350,7 @@ function sota_magic_contact_map_data_ajax() {
             // Park lookup failed: fall through to grid / callsign lookups below
         }
 
-        // Priority 1: S2S — SOTA API summit coordinates
+        // Priority 1: S2S, from SOTA API summit coordinates
         if ( $is_s2s ) {
             $their_ref = $contact['their_summit'];
             $s2s_key   = 'summit_' . sanitize_key( $their_ref );
@@ -1372,7 +1372,7 @@ function sota_magic_contact_map_data_ajax() {
             continue;
         }
 
-        // Priority 2: grid square — ADIF gridsquare field, then comments
+        // Priority 2: grid square, from the ADIF gridsquare field, then comments
         $grid = sota_magic_extract_grid_square( $contact['gridsquare'] ?? '' )
              ?? sota_magic_extract_grid_square( $contact['comments'] );
         if ( $grid ) {
@@ -1392,7 +1392,7 @@ function sota_magic_contact_map_data_ajax() {
 
         $fail_reasons = [];
 
-        // Priority 4: Callook.info — free, US callsigns only
+        // Priority 4: Callook.info, free, US callsigns only
         $callook_wp   = wp_remote_get( 'https://callook.info/' . rawurlencode( $callsign ) . '/json', [ 'timeout' => 10, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
         $callook_body = ! is_wp_error( $callook_wp ) ? wp_remote_retrieve_body( $callook_wp ) : false;
         if ( $callook_body ) {
@@ -1406,7 +1406,7 @@ function sota_magic_contact_map_data_ajax() {
             $fail_reasons[] = 'Callook: not a US callsign';
         } else { $fail_reasons[] = 'Callook: request failed'; }
 
-        // Priority 5: HamQTH — free account, international
+        // Priority 5: HamQTH, free account, international
         if ( $hamqth_session ) {
             $hqth_wp   = wp_remote_get( 'https://www.hamqth.com/xml.php?id=' . rawurlencode( $hamqth_session ) . '&callsign=' . rawurlencode( $callsign ) . '&prg=Activator-Toolkit-for-SOTA', [ 'timeout' => 15, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
             $hqth_body = ! is_wp_error( $hqth_wp ) ? wp_remote_retrieve_body( $hqth_wp ) : false;
@@ -1425,7 +1425,7 @@ function sota_magic_contact_map_data_ajax() {
             usleep( 250000 );
         } else { $fail_reasons[] = 'HamQTH: not configured'; }
 
-        // Priority 6: QRZ.com — paid subscription, international
+        // Priority 6: QRZ.com, paid subscription, international
         if ( $qrz_session ) {
             $qrz_wp   = wp_remote_get( 'https://xmldata.qrz.com/xml/current/?s=' . rawurlencode( $qrz_session ) . '&callsign=' . rawurlencode( $callsign ), [ 'timeout' => 15, 'user-agent' => 'Activator-Toolkit-for-SOTA/1.0' ] );
             $qrz_body = ! is_wp_error( $qrz_wp ) ? wp_remote_retrieve_body( $qrz_wp ) : false;
@@ -1649,7 +1649,7 @@ add_action('enqueue_block_editor_assets', function() {
                         !isPota && wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', marginBottom:'8px', display:'flex', alignItems:'center', gap:'12px'}},
                             wp.element.createElement('div', {style:{flex:'1', minWidth:'0'}},
                                 wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, '📍 GPS Track (.gpx)'),
-                                wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, 'The track file exported from your GPS device or app — Garmin, Gaia GPS, CalTopo, etc.')
+                                wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, 'The track file exported from your GPS device or app, such as Garmin, Gaia GPS, or CalTopo.')
                             ),
                             wp.element.createElement(wp.blockEditor.MediaUpload, {
                                 onSelect: function(media) { props.setAttributes({gpxUrl: media.url}); },
@@ -1673,7 +1673,7 @@ add_action('enqueue_block_editor_assets', function() {
                         wp.element.createElement('div', {style:{background:'\\x23ffffff', border:'1px solid \\x23dddddd', borderRadius:'6px', padding:'12px 14px', display:'flex', alignItems:'center', gap:'12px'}},
                             wp.element.createElement('div', {style:{flex:'1', minWidth:'0'}},
                                 wp.element.createElement('div', {style:{fontWeight:'700', fontSize:'13px', color:'\\x231e1e1e', marginBottom:'3px'}}, isPota ? '📋 POTA Log (.adi or .adif)' : '📋 Contacts Log (.csv or .adif)'),
-                                wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, isPota ? 'Upload the ADIF log from your POTA activation, the same file you submit to pota.app. Your park reference is detected automatically.' : 'Upload your SOTA formatted CSV or ADIF log file — the format is detected automatically.')
+                                wp.element.createElement('div', {style:{fontSize:'12px', color:'\\x23666666', lineHeight:'1.5'}}, isPota ? 'Upload the ADIF log from your POTA activation, the same file you submit to pota.app. Your park reference is detected automatically.' : 'Upload your SOTA formatted CSV or ADIF log file. The format is detected automatically.')
                             ),
                             wp.element.createElement(wp.blockEditor.MediaUpload, {
                                 onSelect: function(media) {
@@ -1742,7 +1742,7 @@ add_action('enqueue_block_editor_assets', function() {
                         wp.element.createElement('div', {style:{fontSize:'13px', lineHeight:'1.65', color:'\\x23333333', maxWidth:'500px'}},
 
                             wp.element.createElement('h3', {style:{marginTop:'0', marginBottom:'6px', color:'\\x230073aa', fontSize:'14px'}}, 'Activation Zone'),
-                            wp.element.createElement('p', {style:{marginTop:'0'}}, 'The activation zone boundary is the foundation — all time stats depend on it. Here is how it is determined, in order:'),
+                            wp.element.createElement('p', {style:{marginTop:'0'}}, 'The activation zone boundary is the foundation: all time stats depend on it. Here is how it is determined, in order:'),
                             wp.element.createElement('ol', {style:{paddingLeft:'18px', margin:'6px 0 0 0'}},
                                 wp.element.createElement('li', {style:{marginBottom:'5px'}}, wp.element.createElement('strong', null, 'Summit reference'), ' is read from your CSV file (e.g. W6/CT-001).'),
                                 wp.element.createElement('li', {style:{marginBottom:'5px'}}, wp.element.createElement('strong', null, 'Official coordinates'), ' are fetched from the SOTA API (api2.sota.org.uk).'),
@@ -1753,7 +1753,7 @@ add_action('enqueue_block_editor_assets', function() {
                             wp.element.createElement('hr', {style:{border:'none', borderTop:'1px solid \\x23eeeeee', margin:'14px 0'}}),
 
                             wp.element.createElement('h3', {style:{margin:'0 0 8px 0', color:'\\x230073aa', fontSize:'14px'}}, 'Time Statistics'),
-                            wp.element.createElement('p', {style:{margin:'0 0 6px 0'}}, wp.element.createElement('strong', null, 'Activation Time: '), 'All time spent inside the activation zone — whether you are moving around the summit, setting up, or operating.'),
+                            wp.element.createElement('p', {style:{margin:'0 0 6px 0'}}, wp.element.createElement('strong', null, 'Activation Time: '), 'All time spent inside the activation zone, whether you are moving around the summit, setting up, or operating.'),
                             wp.element.createElement('p', {style:{margin:'0 0 6px 0'}}, wp.element.createElement('strong', null, 'Hiking Time: '), 'All time spent outside the zone. Rest breaks are included and shown as a sub-note under hiking time.'),
                             wp.element.createElement('p', {style:{margin:'0'}}, wp.element.createElement('strong', null, 'Total Time: '), 'Elapsed time from the first to the last GPS trackpoint.'),
 
@@ -1761,16 +1761,16 @@ add_action('enqueue_block_editor_assets', function() {
 
                             wp.element.createElement('h3', {style:{margin:'0 0 8px 0', color:'\\x230073aa', fontSize:'14px'}}, 'Why Stats Might Look Wrong'),
                             wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
-                                wp.element.createElement('strong', null, 'Activation time is 0 or missing'), ' — The plugin could not locate the activation zone. Check that your CSV file includes a valid summit reference. Turn on Debug Mode in Settings → Activator Toolkit for details.'
+                                wp.element.createElement('strong', null, 'Activation time is 0 or missing'), ': The plugin could not locate the activation zone. Check that your CSV file includes a valid summit reference. Turn on Debug Mode in Settings → Activator Toolkit for details.'
                             ),
                             wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
-                                wp.element.createElement('strong', null, 'Zone looks wrong on the map'), ' — Look for a red polygon (API-based) or orange circle (radius fallback) on the map. If you see a circle, the API did not return a zone. Try increasing the radius in Settings, or use the Statistics Override below to force a specific value.'
+                                wp.element.createElement('strong', null, 'Zone looks wrong on the map'), ': Look for a red polygon (API-based) or orange circle (radius fallback) on the map. If you see a circle, the API did not return a zone. Try increasing the radius in Settings, or use the Statistics Override below to force a specific value.'
                             ),
                             wp.element.createElement('p', {style:{margin:'0 0 8px 0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
-                                wp.element.createElement('strong', null, 'Hiking time seems too high'), ' — Rest breaks are included in hiking time. Adjust the rest break threshold in Settings → Activator Toolkit.'
+                                wp.element.createElement('strong', null, 'Hiking time seems too high'), ': Rest breaks are included in hiking time. Adjust the rest break threshold in Settings → Activator Toolkit.'
                             ),
                             wp.element.createElement('p', {style:{margin:'0', padding:'8px 10px', background:'\\x23fff8e1', borderRadius:'4px', borderLeft:'3px solid \\x23f59e0b'}},
-                                wp.element.createElement('strong', null, 'GPS track does not reach the summit'), ' — The zone is centred on the official SOTA summit coordinates (or the highest GPS point if the SOTA API was unavailable). If you stopped before the peak, use the Activation Zone radius override below or manually enter the activation time.'
+                                wp.element.createElement('strong', null, 'GPS track does not reach the summit'), ': The zone is centred on the official SOTA summit coordinates (or the highest GPS point if the SOTA API was unavailable). If you stopped before the peak, use the Activation Zone radius override below or manually enter the activation time.'
                             )
                         )
                     ),
@@ -2260,7 +2260,7 @@ function sota_magic_render_sota_data($atts) {
             'sotaMagicInitMap(' . wp_json_encode($map_id) . ', ' . wp_json_encode($map_data) . ');'
         );
 
-        // Modal escape-key handler — added once per page even with multiple blocks
+        // Modal escape-key handler, added once per page even with multiple blocks
         static $modal_script_added = false;
         if ( ! $modal_script_added ) {
             wp_add_inline_script( 'activator-toolkit-map', '(function(){document.addEventListener("keydown",function(e){if(e.key==="Escape"){var m=document.getElementById("sota-stats-modal");if(m)m.classList.remove("sota-modal-open");}});})();' );
@@ -2279,7 +2279,7 @@ function sota_magic_render_sota_data($atts) {
                 <canvas id="<?php echo esc_attr($map_id); ?>-chart"></canvas>
             </div>
             <?php else: ?>
-            <p style="color:#888;font-style:italic;margin:10px 0 16px;">Map unavailable — GPX file could not be loaded.</p>
+            <p style="color:#888;font-style:italic;margin:10px 0 16px;">Map unavailable: the GPX file could not be loaded.</p>
             <?php endif; ?>
 
             <?php if ($gpx_stats && !$hide_stats_display): ?>
@@ -2373,7 +2373,7 @@ function sota_magic_render_sota_data($atts) {
 
                         <div class="sota-modal-section">
                             <h3><?php sota_magic_echo_svg('hike', 17); ?> Hiking Time &amp; Distance</h3>
-                            <p>Time and distance accumulated while <strong>moving outside the activation zone</strong> at a speed above the stationary threshold (default 0.3 km/h). Periods where you were stopped — waiting at a trailhead, taking a break — are excluded and counted separately as Rest Breaks.</p>
+                            <p>Time and distance accumulated while <strong>moving outside the activation zone</strong> at a speed above the stationary threshold (default 0.3 km/h). Periods where you were stopped (waiting at a trailhead, taking a break) are excluded and counted separately as Rest Breaks.</p>
                         </div>
 
                         <div class="sota-modal-section">
@@ -2383,7 +2383,7 @@ function sota_magic_render_sota_data($atts) {
 
                         <div class="sota-modal-section">
                             <h3><?php sota_magic_echo_svg('radio', 17); ?> Activation Time</h3>
-                            <p><strong>All time spent inside the activation zone</strong>, regardless of whether you were moving or stationary. This captures the full period from when you first entered the zone to when you left — including any walking around the summit, setting up gear, and operating.</p>
+                            <p><strong>All time spent inside the activation zone</strong>, regardless of whether you were moving or stationary. This captures the full period from when you first entered the zone to when you left, including any walking around the summit, setting up gear, and operating.</p>
                             <p>The activation zone boundary is determined by one of two methods (see below).</p>
                         </div>
 
