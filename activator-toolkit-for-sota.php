@@ -2319,14 +2319,17 @@ function sota_magic_render_sota_data($atts) {
                         <div class="sota-stat-icon"><?php sota_magic_echo_svg('timer', 30); ?></div>
                         <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_time_duration($gpx_stats['total_time'])); ?></div>
                         <div class="sota-stat-label">Total Time</div>
-                        <div class="sota-stat-secondary"><?php echo esc_html(sota_magic_format_distance($gpx_stats['total_distance'], $unit_system)); ?></div>
+                        <div class="sota-stat-secondary">start to finish</div>
                     </div>
 
                     <div class="sota-stat-box">
                         <div class="sota-stat-icon"><?php sota_magic_echo_svg('trend-up', 30); ?></div>
                         <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_elevation($gpx_stats['elevation_gain'], $unit_system)); ?></div>
                         <div class="sota-stat-label">Elevation Gain</div>
-                        <div class="sota-stat-secondary">↓ <?php echo esc_html(sota_magic_format_elevation($gpx_stats['elevation_loss'], $unit_system)); ?> loss</div>
+                        <div class="sota-stat-secondary">
+                            ↓ <?php echo esc_html(sota_magic_format_elevation($gpx_stats['elevation_loss'], $unit_system)); ?> loss
+                            <br>Peak <?php echo esc_html(sota_magic_format_elevation($gpx_stats['max_elevation'], $unit_system)); ?>
+                        </div>
                     </div>
 
                     <div class="sota-stat-box">
@@ -2337,10 +2340,10 @@ function sota_magic_render_sota_data($atts) {
                     </div>
 
                     <div class="sota-stat-box">
-                        <div class="sota-stat-icon"><?php sota_magic_echo_svg('peak', 30); ?></div>
-                        <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_elevation($gpx_stats['max_elevation'], $unit_system)); ?></div>
-                        <div class="sota-stat-label">Peak Elevation</div>
-                        <div class="sota-stat-secondary"><?php echo esc_html(sota_magic_format_elevation($gpx_stats['min_elevation'], $unit_system)); ?> base</div>
+                        <div class="sota-stat-icon"><?php sota_magic_echo_svg('distance', 30); ?></div>
+                        <div class="sota-stat-value"><?php echo esc_html(sota_magic_format_distance($gpx_stats['total_distance'], $unit_system)); ?></div>
+                        <div class="sota-stat-label">Total Distance</div>
+                        <div class="sota-stat-secondary">entire hike</div>
                     </div>
                 </div>
 
@@ -2390,8 +2393,9 @@ function sota_magic_render_sota_data($atts) {
                         </div>
 
                         <div class="sota-modal-section">
-                            <h3><?php sota_magic_echo_svg('trend-up', 17); ?> Elevation Gain &amp; Loss</h3>
-                            <p>The <strong>cumulative</strong> altitude gained and lost across all trackpoints. Each uphill step between consecutive points adds to gain; each downhill step adds to loss. Out-and-back routes will show roughly equal gain and loss.</p>
+                            <h3><?php sota_magic_echo_svg('trend-up', 17); ?> Elevation Gain, Loss &amp; Peak</h3>
+                            <p>Gain and loss are the <strong>cumulative</strong> altitude climbed and descended across all trackpoints. Each uphill step between consecutive points adds to gain; each downhill step adds to loss. Out-and-back routes will show roughly equal gain and loss.</p>
+                            <p>Peak is the <strong>highest elevation</strong> recorded in the GPS track. It is also used as the starting reference for the activation zone when a terrain-based zone is used.</p>
                         </div>
 
                         <div class="sota-modal-section">
@@ -2400,8 +2404,8 @@ function sota_magic_render_sota_data($atts) {
                         </div>
 
                         <div class="sota-modal-section">
-                            <h3><?php sota_magic_echo_svg('peak', 17); ?> Peak &amp; Base Elevation</h3>
-                            <p>The <strong>highest and lowest elevation values</strong> recorded in the GPS track. The highest point is also used as the starting reference for the activation zone when the API method is used.</p>
+                            <h3><?php sota_magic_echo_svg('distance', 17); ?> Total Distance</h3>
+                            <p>The full length of the <strong>entire GPS track</strong>, from the first to the last trackpoint, including time spent in the activation zone.</p>
                         </div>
 
                         <div class="sota-modal-section">
